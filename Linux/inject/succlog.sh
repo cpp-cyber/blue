@@ -1,6 +1,5 @@
 #!/bin/sh
 # @d_tranman/Nigel Gerald/Nigerald
-# This prints the total amount of successful logins
 
 RHEL(){
   cat /var/log/secure | grep 'Accepted password' | wc -l

@@ -1,6 +1,5 @@
 #!/bin/sh
 # @d_tranman/Nigel Gerald/Nigerald
-# Prints the top 10 users with the most frequent login attempts
 
 RHEL(){
   cat /var/log/secure | grep -E '(Failed|Accepted) password'  | awk -F 'for' '{print $2}' | awk  '{ if ($1 != "invalid" && $2 != "user") { print $1 } else { print $3 } }' | sort | uniq -c | sort -nr

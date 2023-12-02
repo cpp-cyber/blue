@@ -1,8 +1,5 @@
 #!/bin/sh
 # @d_tranman/Nigel Gerald/Nigerald
-# This returns a hostname and the primary subnet(s?) of a machine. Useful for mass fingerprinting. Also kinda forgot is regex is working cause I wrote it a year ago
-
-# DEBUG        - [ OPT ] If given a value, more stderr will be present.
 
 if [ -z "$DEBUG" ]; then
     DPRINT() { 

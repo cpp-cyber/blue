@@ -1,7 +1,5 @@
 #!/bin/sh
 # @d_tranman/Nigel Gerald/Nigerald
-# Prints the total amount of failed logins 
-
 RHEL(){
   cat /var/log/secure | grep 'Failed password' | wc -l
 }
