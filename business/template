@@ -1,5 +1,5 @@
 ' HEADER AND FOOTER HANDLING
-Sub ChangeHeaderFooterColor()
+Sub HEADERFOOTERCOLOR()
 
 	Dim oDoc 
 	Dim pageStyle As String
@@ -38,7 +38,7 @@ End Sub
 ' This document can contain data that is proprietary to the company and cannot be transferred. Only authorized employees can view information transmitted in this document. If you received this document in error please delete it from your systems immediately.
 
 ' PADDING FIX
-Sub EditDefaultParagraphStylePadding()
+Sub PADDINGTONCITY()
 
     Dim oDoc As Object
     Dim oStyles As Object
