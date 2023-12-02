@@ -72,7 +72,7 @@ if ($Connect) {
             exit
         }
 
-        Write-Host "[INFO] Found the following sevrers:" -ForegroundColor Green
+        Write-Host "[INFO] Found the following servers:" -ForegroundColor Green
         foreach ($Computer in $Computers) {
             Write-Host "$Computer"
         }
@@ -118,7 +118,7 @@ if (($Script -ne '') -and ($global:Sessions.Count -gt 0) -and ($Out -ne '')) {
                 $P1 = Get-Password
                 $P2 = Get-Password
                 $ScriptJob = Invoke-Command -FilePath $Script -ArgumentList $Admin, $P1, $P2 -Session $Session -AsJob
-                Write-Host ("[INFO: $Script - $($Session.ComputerName)] Created ${0}:${1}" -f $Admin, $P2) -ForegroundColor Magenta
+                Write-Host "[INFO: $Script - $($Session.ComputerName)] Created $($Admin):$($P2)" -ForegroundColor Magenta
                 Write-Host "[INFO: $Script - $($Session.ComputerName)] Changed all users to $P1" -ForegroundColor Magenta
                 Write-Output ("$($Session.ComputerName):$($Admin):$($P2)") | Out-File $Out\usr_log.txt -Append -Encoding utf8
                 Write-Output ("$($Session.ComputerName):All:$($P1)") | Out-File $Out\usr_log.txt -Append -Encoding utf8
