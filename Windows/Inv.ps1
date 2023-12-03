@@ -14,7 +14,12 @@ if ($DC) {
     Write-Output "`n#### DC Detected ####"
 
     Write-Output "`n#### Start DNS Records ####"
-    Get-DnsServerResourceRecord -ZoneName ccdc.local | ? {$_.RecordType -notin @("SRV","NS","SOA") -and $_.HostName -notin @("@","DomainDnsZones","ForestDnsZones")} | Select-Object HostName, RecordType, Timestamp, TimeToLive, RecordData | Format-Table
+    try {
+        Get-DnsServerResourceRecord -ZoneName ccdc.local | ? {$_.RecordType -notmatch "SRV|NS|SOA" -and $_.HostName -notmatch "@|DomainDnsZones|ForestDnsZones"} | Format-Table
+    }
+    catch {
+        Write-Output "[ERROR] Failed to get DNS records, DC likely too old"
+    }
     Write-Output "#### End DNS Records ####"
 }
 
