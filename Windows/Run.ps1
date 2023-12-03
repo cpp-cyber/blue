@@ -9,6 +9,9 @@ param(
     [switch]$Connect,
 
     [Parameter(Mandatory=$false)]
+    [switch]$Repair,
+
+    [Parameter(Mandatory=$false)]
     [string[]]$Include,
 
     [Parameter(Mandatory=$false)]
@@ -35,56 +38,89 @@ function Get-Password {
 
 if ($Connect) {
 
-    Remove-Variable -Name Sessions -Scope Global -ErrorAction SilentlyContinue;
-    Remove-Variable -Name Denied -Scope Global -ErrorAction SilentlyContinue;
-    $global:Sessions = @()
-    $global:Denied = @()
-    Get-PSSession | Remove-PSSession
+    if (!$Repair) {
+        Remove-Variable -Name Sessions -Scope Global -ErrorAction SilentlyContinue;
+        Remove-Variable -Name Denied -Scope Global -ErrorAction SilentlyContinue;
+        $global:Sessions = @()
+        $global:Denied = @()
+        Get-PSSession | Remove-PSSession
+    }
 
     if ($NonDomain) {
         $global:Cred = Get-Credential
-        try {
-            $Computers = Get-Content $Hosts
-        }
-        catch {
-            Write-Host "[ERROR] Failed to get computers from file" -ForegroundColor Red
-            exit
-        }
 
-        foreach ($Computer in $Computers) {
-            $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred
-            if ($TestSession) {
-                $global:Sessions += $TestSession
-                Write-Host "[INFO] Connected: $Computer" -ForegroundColor Green
+        if ($Repair) {
+            if ($global:Sessions.Count -eq 0) {
+                Write-Host "[ERROR] No sessions" -ForegroundColor Red
+                exit
             }
             else {
-                $global:Denied += $Computer
-                Write-Host "[ERROR] Failed: $Computer" -ForegroundColor Red
+                for ($i = 0; $i -lt $global:Sessions.count; $i++) {
+                    if ($Sessions[$i].State -eq "Broken" -or $Sessions[$i].State -eq "Disconnected") {
+                        $global:Sessions[$i] = New-PSSession -ComputerName $global:Sessions[$i].ComputerName -Credential $global:Cred
+                        Write-Host "[INFO] Reconnected: $($global:Sessions[$i].ComputerName)" -ForegroundColor Green
+                    }
+                }
+            }
+        } else {
+            try {
+                $Computers = Get-Content $Hosts
+            }
+            catch {
+                Write-Host "[ERROR] Failed to get computers from file" -ForegroundColor Red
+                exit
+            }
+    
+            foreach ($Computer in $Computers) {
+                $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred
+                if ($TestSession) {
+                    $global:Sessions += $TestSession
+                    Write-Host "[INFO] Connected: $Computer" -ForegroundColor Green
+                }
+                else {
+                    $global:Denied += $Computer
+                    Write-Host "[ERROR] Failed: $Computer" -ForegroundColor Red
+                }
             }
         }
     }
     else {
-        try {
-            $Computers = Get-ADComputer -filter * -Properties * | Where-Object OperatingSystem -Like "*Windows*" | Sort-Object | Select-Object -ExpandProperty Name
-        }
-        catch {
-            Write-Host "[ERROR] Failed to get computers from AD" -ForegroundColor Red
-            exit
-        }
-
-        Write-Host "[INFO] Found the following servers:" -ForegroundColor Green
-        foreach ($Computer in $Computers) {
-            Write-Host "$Computer"
-        }
-        foreach ($Computer in $Computers) {
-            $TestSession = New-PSSession -ComputerName $Computer
-            if ($TestSession) {
-                $global:Sessions += $TestSession
-                Write-Host "[INFO] Connected: $Computer" -ForegroundColor Green
+        if ($Repair) {
+            if ($global:Sessions.Count -eq 0) {
+                Write-Host "[ERROR] No sessions" -ForegroundColor Red
+                exit
             }
             else {
-                $global:Denied += $Computer
-                Write-Host "[ERROR] Failed: $Computer" -ForegroundColor Red
+                for ($i = 0; $i -lt $global:Sessions.count; $i++) {
+                    if ($Session.State -eq "Broken" -or $Session.State -eq "Disconnected") {
+                        $global:Sessions[$i] = New-PSSession -ComputerName $global:Sessions[$i].ComputerName
+                        Write-Host "[INFO] Reconnected: $($global:Sessions[$i].ComputerName)" -ForegroundColor Green
+                    }
+                }
+            }
+        } else {
+            try {
+                $Computers = Get-ADComputer -filter * -Properties * | Where-Object OperatingSystem -Like "*Windows*" | Sort-Object | Select-Object -ExpandProperty Name
+            }
+            catch {
+                Write-Host "[ERROR] Failed to get computers from AD" -ForegroundColor Red
+                exit
+            }
+    
+            Write-Host "[INFO] Found the following servers:" -ForegroundColor Green
+            foreach ($Computer in $Computers) {
+                Write-Host "$Computer"
+            }
+            foreach ($Computer in $Computers) {
+                $TestSession = New-PSSession -ComputerName $Computer
+                if ($TestSession) {
+                    $global:Sessions += $TestSession
+                    Write-Host "[INFO] Connected: $Computer" -ForegroundColor Green
+                }
+                else {
+                    $global:Denied += $Computer
+                    Write-Host "[ERROR] Failed: $Computer" -ForegroundColor Red
+                }
             }
         }
     }
@@ -131,18 +167,23 @@ if (($Script -ne '') -and ($global:Sessions.Count -gt 0) -and ($Out -ne '')) {
         Write-Host "[INFO: $Script] Script invoked on $($Session.ComputerName)" -ForegroundColor Green
     }
     
-    $Complete = 0
+    $Complete = @()
     $TotalJobs = $Jobs.count
     $IncompleteJobs = @()
-    while ($Complete -lt $TotalJobs) {
+    while ($Complete.Count -lt $TotalJobs) {
         for ($i = 0; $i -lt $Jobs.count; $i++) {
-            if ($Jobs[$i].State -eq "Completed") {
+            if ($Jobs[$i].State -eq "Completed" -and $Complete -notcontains $Jobs[$i].Location) {
                 $Jobs[$i] | Receive-Job | Out-File "$Out\$($Jobs[$i].Location).$Extension" -Encoding utf8
                 Write-Host "[INFO: $Script] Script completed on $($Jobs[$i].Location) logged to $Extension" -ForegroundColor Green
-                $Complete++
+                $Complete += $($Jobs[$i].Location)
+                #Get-Job
             }
-            elseif($Jobs[$i].State -eq "Running"){
+            elseif ($Jobs[$i].State -eq "Running" -and $Complete -notcontains $Jobs[$i].Location){
                 $IncompleteJobs += $Jobs[$i]
+            }
+            elseif ($Jobs[$i].State -eq "Failed" -and $Complete -notcontains $Jobs[$i].Location){
+                Write-Host "[ERROR: $Script] Script failed on $($Jobs[$i].Location)" -ForegroundColor Red
+                $Complete += $($Jobs[$i].Location)
             }
         }
         if ($IncompleteJobs.Count -ge 1){
