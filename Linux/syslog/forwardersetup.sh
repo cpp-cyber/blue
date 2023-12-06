@@ -79,6 +79,10 @@ if [ ! $DF ]; then
     fi
 fi
 
+if [ ! -d '/etc/rsyslog.d' ]; then
+    mkdir /etc/rsyslog.d
+fi
+
 cat << EOF > /etc/rsyslog.d/69-remote.conf
 
 # Ubuntu Auth 
