@@ -3,7 +3,7 @@ FROM ubuntu
 RUN apt update && apt install rsyslog -y
 RUN echo '$ModLoad imudp\n\
 $UDPServerRun 514 \n\
-$template Auth_Log, "/var/log/remote/auth_log \n\
+$template Auth_Log, "/var/log/remote/auth_log" \n\
 $template Access_Log, "/var/log/remote/access_log" \n\
 $template Event_Log, "/var/log/remote/event_log" \n\
 $template Honeypot, "/var/log/remote/honeypot" \n\
