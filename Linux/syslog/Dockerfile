@@ -13,6 +13,7 @@ local1.* ?Auth_Log \n\
 local2.* ?Access_Log \n\
 local3.* ?Honeypot \n\
 local4.* ?Database \n\
-local5.* ?Audit ' > /etc/rsyslog.conf
+local5.* ?Audit \n\
+local6.* ?Event_Log ' > /etc/rsyslog.conf
 
 ENTRYPOINT [ "rsyslogd", "-n" ]
