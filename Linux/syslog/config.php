@@ -135,6 +135,12 @@ $CFG['Sources']['Source4']['SourceType'] = SOURCE_DISK;
 $CFG['Sources']['Source4']['LogLineType'] = 'syslog';
 $CFG['Sources']['Source4']['DiskFile'] = '/var/log/remote/database';
 
+$CFG['Sources']['Source5']['ID'] = 'Source5';
+$CFG['Sources']['Source5']['Name'] = 'Event Logs';
+$CFG['Sources']['Source5']['ViewID'] = 'SYSLOG';
+$CFG['Sources']['Source5']['SourceType'] = SOURCE_DISK;
+$CFG['Sources']['Source5']['LogLineType'] = 'syslog';
+$CFG['Sources']['Source5']['DiskFile'] = '/var/log/remote/event_log';
 // --- 
 
 ?>
