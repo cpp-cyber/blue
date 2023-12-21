@@ -34,6 +34,8 @@ if (!$Purge -and $Hosts -ne '' -and $Cred -ne $null) {
         }
         
     }
+    Write-Host "[INFO] Done... Listing Errors" -ForegroundColor Green
+    Get-Content .\robo.log | ? {$_ -match "ERROR"} | % {Write-Host $_ -ForegroundColor Red}
 }
 elseif ($Purge) {
     Get-PSDrive | ? {$_.DisplayRoot -ne $null} | Remove-PSDrive
