@@ -6,8 +6,48 @@ param(
     [System.Management.Automation.PSCredential]$Cred = $Global:Cred,
 
     [Parameter(Mandatory=$false)]
+    [Int]$Timeout = 3000,
+
+    [Parameter(Mandatory=$false)]
     [Switch]$Purge
 )
+function Test-Port {
+    Param(
+        [string]$Ip,
+        [int]$Port = 445,
+        [int]$Timeout = 3000,
+        [switch]$Verbose
+    )
+
+    $ErrorActionPreference = "SilentlyContinue"
+
+    $tcpclient = New-Object System.Net.Sockets.TcpClient
+    $iar = $tcpclient.BeginConnect($ip,$port,$null,$null)
+    $wait = $iar.AsyncWaitHandle.WaitOne($timeout,$false)
+    if (!$wait)
+    {
+        # Close the connection and report timeout
+        $tcpclient.Close()
+        if($verbose){Write-Host "[ERROR] $($IP):$Port Connection Timeout " -ForegroundColor Red}
+        return $false
+    } 
+    else {
+        # Close the connection and report the error if there is one
+        $error.Clear()
+        $tcpclient.EndConnect($iar) | out-Null
+        if(!$?){if($verbose){write-host $error[0] -ForegroundColor Red};$failed = $true}
+        $tcpclient.Close()
+    }
+
+    if ($failed) {
+        return $false
+    }
+    else {
+        return $true
+    }
+}
+
+
 if (!$Purge -and $Hosts -ne '' -and $Cred -ne $null) {
     try {
         $Computers = Get-Content $Hosts
@@ -23,16 +63,16 @@ if (!$Purge -and $Hosts -ne '' -and $Cred -ne $null) {
     
     foreach ($Computer in $Computers) {
         if ($i -ge 0) {
-            try {
+            if (Test-Port -Ip $Computer -Timeout $Timeout -Verbose) {
+                Write-Host "[INFO] $Computer SMB is online... Copying" -ForegroundColor Green
                 New-PSDrive -Name $DriveLetters[$i] -PSProvider FileSystem -Root \\$Computer\C$ -Persist -Credential $Cred
                 Robocopy.exe .\bins \\$Computer\C$\Windows\System32\bins /COMPRESS /MT:16 /R:1 /W:1 /UNILOG+:robo.log /TEE
             }
-            catch {
+            else {
                 Write-Host "[ERROR] Failed to move bins to $Computer" -ForegroundColor Red
             }
             $i--
         }
-        
     }
     Write-Host "[INFO] Done... Listing Errors" -ForegroundColor Green
     Get-Content .\robo.log | ? {$_ -match "ERROR"} | % {Write-Host $_ -ForegroundColor Red}
