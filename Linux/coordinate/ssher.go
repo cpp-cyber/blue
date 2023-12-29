@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"net"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -113,7 +113,7 @@ func runner(ip string, outfile string, w *sync.WaitGroup) {
 	deadHost := false
 	ExitString = randomString(RANDSTRLEN)
 	i := instance{
-		IP: ip,
+		IP:      ip,
 		Outfile: outfile,
 	}
 
@@ -128,7 +128,7 @@ func runner(ip string, outfile string, w *sync.WaitGroup) {
 				InfoExtra(i, "Trying password '"+i.Password+"'")
 			}
 			_, err = connect(i)
-			if err != nil && strings.Contains(err.Error(), "Could not connect"){
+			if err != nil && strings.Contains(err.Error(), "Could not connect") {
 				Debug(fmt.Sprintf("Port %d is closed on %s", *port, i.IP))
 				deadHost = true
 				break
@@ -144,7 +144,7 @@ func runner(ip string, outfile string, w *sync.WaitGroup) {
 	}
 
 	if !found {
-		if err != nil && strings.Contains(err.Error(), "Could not connect"){
+		if err != nil && strings.Contains(err.Error(), "Could not connect") {
 			return
 		}
 		ErrExtra(i, "Login attempts failed!")
@@ -160,13 +160,13 @@ func GeraldRunner(ip string, outfile string, w *sync.WaitGroup, username string,
 	found := false
 	ExitString = randomString(RANDSTRLEN)
 	i := instance{
-		IP: ip,
-		Outfile: outfile,
+		IP:       ip,
+		Outfile:  outfile,
 		Username: username,
 		Password: password,
 	}
 	_, err := connect(i)
-	if err != nil && strings.Contains(err.Error(), "Could not connect"){
+	if err != nil && strings.Contains(err.Error(), "Could not connect") {
 		Debug(fmt.Sprintf("Port %d is closed on %s", *port, i.IP))
 	}
 	if err == nil {
@@ -174,7 +174,7 @@ func GeraldRunner(ip string, outfile string, w *sync.WaitGroup, username string,
 		found = true
 	}
 	if !found {
-		if err != nil && strings.Contains(err.Error(), "Could not connect"){
+		if err != nil && strings.Contains(err.Error(), "Could not connect") {
 			return
 		}
 		ErrExtra(i, "Login attempts failed!")
@@ -234,7 +234,7 @@ func connect(i instance) (*ssh.Session, error) {
 	// Ensure host has ssh open
 	if !isPortOpen(i.IP, *port) {
 		err := errors.New(fmt.Sprintf("Could not connect to %s:%d", i.IP, *port))
-	return &ssh.Session{}, err
+		return &ssh.Session{}, err
 	}
 
 	// Connect to host
@@ -245,7 +245,7 @@ func connect(i instance) (*ssh.Session, error) {
 	} else {
 		// Create sesssion
 		sess, err := client.NewSession()
-		
+
 		if err != nil {
 			Info("Session creation failed :(")
 		} else {
@@ -257,9 +257,18 @@ func connect(i instance) (*ssh.Session, error) {
 }
 
 func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan bool, wg *sync.WaitGroup) {
+
+	ManualExit := false
+	ScriptChanDone := false
 	//noodle
 	defer func() {
-		exitChan <- true
+		if !ManualExit {
+			exitChan <- true
+		} else {
+			if !ScriptChanDone {
+				_, _ = <-scriptChan
+			}
+		}
 	}()
 	defer sess.Close()
 	defer wg.Done()
@@ -279,19 +288,32 @@ func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan 
 	var stderrOffset int
 
 	// Start remote shell
-	
 	err = sess.Shell()
 	if err != nil {
 		Err(err)
 		return
 	}
-	
 
 	index := 1
 	escalated := false
 
 	InfoExtra(i, "Interactive shell on", i.IP)
-	
+
+	// Initial wait to let the normal stdout flow from MOTD
+	time.Sleep(1 * time.Second)
+
+	// Safe to asssume all systems have whoami. If whoami returns nothing, stdin is prob borked for this shell (fish)
+	origStdOut := stdoutBytes
+	fmt.Fprintf(stdin, "whoami\n")
+	time.Sleep(250 * time.Millisecond)
+	difference := strings.Replace(stdoutBytes.String(), origStdOut.String(), "", -1)
+	difference = strings.Replace(difference, "\n", "", -1)
+	if len(difference) == 0 {
+		ManualExit = true
+		Crit(i, "Coordinate stdin is borked on this host!")
+		return
+	}
+
 	if !*noValidate {
 		if !validateShell(i, stdin, &stdoutBytes, stdoutOffset) {
 			Crit(i, "Shell did not respond (to echo) before timeout!")
@@ -300,7 +322,7 @@ func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan 
 			DebugExtra(i, "Shell appears to be valid (echoes back successfully).")
 		}
 	}
-	
+
 	stdoutOffset = stdoutBytes.Len()
 	stderrOffset = stderrBytes.Len()
 
@@ -340,16 +362,16 @@ func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan 
 				fmt.Fprintf(stdin, "whoami\n")
 				time.Sleep(2 * time.Second)
 				/*
-				fmt.Printf("Orig -> %s\n", origStdOut.String())
-				fmt.Printf("Orig Length is -> %d\n", origStdOut.Len())
-				fmt.Printf("Current -> %s\n", stdoutBytes.String())
-				fmt.Printf("Current Length is -> %d\n", stdoutBytes.Len())
+					fmt.Printf("Orig -> %s\n", origStdOut.String())
+					fmt.Printf("Orig Length is -> %d\n", origStdOut.Len())
+					fmt.Printf("Current -> %s\n", stdoutBytes.String())
+					fmt.Printf("Current Length is -> %d\n", stdoutBytes.Len())
 				*/
 				difference := strings.Replace(stdoutBytes.String(), origStdOut.String(), "", -1)
 				difference = strings.Replace(difference, "\n", "", -1)
 				/*
-				fmt.Printf("Difference -> %s \n", difference)
-				fmt.Printf("Difference Length -> %d\n", len(difference))
+					fmt.Printf("Difference -> %s \n", difference)
+					fmt.Printf("Difference Length -> %d\n", len(difference))
 				*/
 				if difference != "root" {
 					Crit(i, "Failed to escalate from", i.Username, "to root (via sudo) on", i.IP)
@@ -361,17 +383,18 @@ func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan 
 			}
 		}
 	}
-    //Compare stdout to check hostname
-	origStdOut := stdoutBytes
+
+	// Compare stdout to check hostname
+	origStdOut = stdoutBytes
 	fmt.Fprintf(stdin, "hostname\n")
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	Debug(fmt.Sprintf("Orig -> %s", origStdOut.String()))
 	Debug(fmt.Sprintf("Orig Length is -> %d", origStdOut.Len()))
 	Debug(fmt.Sprintf("Current -> %s", stdoutBytes.String()))
 	Debug(fmt.Sprintf("Current Length is -> %d", stdoutBytes.Len()))
 
-	difference := strings.Replace(stdoutBytes.String(), origStdOut.String(), "", -1)
+	difference = strings.Replace(stdoutBytes.String(), origStdOut.String(), "", -1)
 	difference = strings.Replace(difference, "\n", "", -1)
 	Debug(fmt.Sprintf("Difference -> %s", difference))
 
@@ -379,27 +402,26 @@ func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan 
 	// This will not work at all if theres no /etc/hostname (e.g: /etc/sysconfig/network)
 	// But hopefully we don't run into that edge case? :flushed:
 	if len(difference) == 0 {
-		Debug(fmt.Sprintf("Hostname returned nothing, reading from /etc/hostname"));
+		Debug(fmt.Sprintf("Hostname returned nothing, reading from /etc/hostname"))
 		origStdOut = stdoutBytes
 		fmt.Fprintf(stdin, "cat /etc/hostname\n")
 		time.Sleep(1 * time.Second)
-	        difference = strings.Replace(stdoutBytes.String(), origStdOut.String(), "", -1)
-	        difference = strings.Replace(difference, "\n", "", -1)
-        	Debug(fmt.Sprintf("Difference -> %s", difference))
+		difference = strings.Replace(stdoutBytes.String(), origStdOut.String(), "", -1)
+		difference = strings.Replace(difference, "\n", "", -1)
+		Debug(fmt.Sprintf("Difference -> %s", difference))
 
 		// Worst case, we don't know
 		if len(difference) == 0 {
-			difference = i.IP 
+			difference = i.IP
 		}
 	}
 	i.Hostname = difference
-	i.Outfile = difference+"."+i.Outfile
+	i.Outfile = difference + "." + i.Outfile
 	Debug(fmt.Sprintf("Printing output to -> %s", i.Outfile))
 
+	_, err = fmt.Fprintf(stdin, "/bin/sh\n")
+	time.Sleep(1 * time.Second)
 
-	_ , err = fmt.Fprintf( stdin, "/bin/sh\n" )
-	time.Sleep( 1 * time.Second )
-	
 	if err != nil {
 		Crit(i, "Error spawning /bin/sh", err)
 		return
@@ -410,6 +432,7 @@ func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan 
 		if !ok {
 			return
 		}
+		ScriptChanDone = true
 		i.Script = script
 
 		// read file for module
@@ -465,7 +488,7 @@ func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan 
 			}
 
 			// Actually send the command to remote
-			Debug(fmt.Sprintf("Sending line: %s", line)) 
+			Debug(fmt.Sprintf("Sending line: %s", line))
 			_, err = fmt.Fprintf(stdin, "%s\n", line)
 			if err != nil {
 				Crit(i, "Error submitting line to stdin:", err)
@@ -483,7 +506,7 @@ func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan 
 			DebugExtra(i, "Waiting timeout/2 for script to finish.")
 			time.Sleep(timeout / 2)
 		} else {
-			
+
 			scriptRan = validateShell(i, stdin, &stdoutBytes, stdoutOffset)
 
 			if !scriptRan {
@@ -501,12 +524,12 @@ func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan 
 					Stdout(i, strings.TrimSpace(stdoutBytes.String()[stdoutOffset:stdoutBytes.Len()-randOffset]))
 
 					// Incoming giga jank for config creation
-					if *CreateConfig{
-						TotalOut := strings.TrimSpace(stdoutBytes.String()[stdoutOffset:stdoutBytes.Len()-randOffset])
-						for _,line := range strings.Split(TotalOut, "\n") {
+					if *CreateConfig {
+						TotalOut := strings.TrimSpace(stdoutBytes.String()[stdoutOffset : stdoutBytes.Len()-randOffset])
+						for _, line := range strings.Split(TotalOut, "\n") {
 							if strings.Split(line, ",")[0] == i.Username {
 								Password := strings.Split(line, ",")[1]
-								Entry := ConfigEntry{ i.IP, i.Username, Password }
+								Entry := ConfigEntry{i.IP, i.Username, Password}
 								ConfigEntries = append(ConfigEntries, Entry)
 							}
 						}
@@ -617,9 +640,9 @@ func waitOutput(output *bytes.Buffer, offset int, randStr string) bool {
 		if output.Len()-offset >= len(randStr)+1 {
 			if strings.Contains(strings.TrimSpace(output.String()[output.Len()-len(randStr)-1:]), randStr) {
 				return true
-			} else if strings.Contains(strings.TrimSpace(output.String()[output.Len()-len(randStr)-1:]), ExitString){
+			} else if strings.Contains(strings.TrimSpace(output.String()[output.Len()-len(randStr)-1:]), ExitString) {
 				return true
-			} 
+			}
 		}
 		time.Sleep(shortTimeout)
 	}
