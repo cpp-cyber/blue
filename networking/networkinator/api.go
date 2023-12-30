@@ -127,13 +127,13 @@ func AddConnection(c *gin.Context) {
 
 	tx = db.First(&models.Connection{}, "Src = ? AND Dst = ? AND Port = ?", srcHost.ID, dstHost.ID, portInt)
 	if tx.Error == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error4": "Connection already exists"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Connection already exists"})
 		return
 	}
 
 	err = createConnection(db, srcHost.ID, dstHost.ID, portInt)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error3": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
