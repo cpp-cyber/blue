@@ -2,6 +2,11 @@
 # @d_tranman/Nigel Gerald/Nigerald
 ipt=$(command -v iptables || command -v /sbin/iptables || command -v /usr/sbin/iptables)
 
+if [ -z "$ipt" ]; then
+    echo "NO IPTABLES ON THIS SYSTEM, GOOD LUCK"
+    exit 1
+fi
+
 if [ -z "$LOCALNETWORK" ]; then
     echo "LOCALNETWORK not defined."
     exit 1
@@ -10,11 +15,6 @@ fi
 if [ -z "$CCSHOST" ] && [ -z "$NOTNATS" ]; then
     echo "CCSHOST not defined and WE ARE AT NATS BRO!"
     exit 1
-fi
-
-if [ -n "$SSHUSER" ] && [ -z "$PASS" ]; then
-	echo "SSHUSER is defined, but not PASS. Exiting to prevent lockout."
-	exit 1
 fi
 
 $ipt -P OUTPUT ACCEPT ; $ipt -P FORWARD ACCEPT ; $ipt -F; $ipt -X ;$ipt -P INPUT ACCEPT 

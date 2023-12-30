@@ -2,16 +2,16 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-	"io/ioutil"
-	"encoding/json"
-	"regexp"
 
 	"golang.org/x/term"
 	"inet.af/netaddr"
@@ -26,7 +26,7 @@ type instance struct {
 	Password string
 	Script   string
 	Port     int
-	Outfile	string
+	Outfile  string
 	Hostname string
 }
 
@@ -38,13 +38,15 @@ type Script struct {
 }
 
 type ConfigEntry struct {
-	IP string
+	IP       string
 	Username string
 	Password string
 }
+
 var (
 	timeout      time.Duration
 	shortTimeout time.Duration
+	BrokenHosts  []string
 )
 
 var (
@@ -55,7 +57,7 @@ var (
 	usernames = flag.StringP("usernames", "u", "", "List of usernames")
 	passwords = flag.StringP("passwords", "p", "", "List of passwords")
 	callbacks = flag.StringP("callbacks", "c", "", "Callback IP address(es)")
-	outfile	  = flag.StringP("outfile-ext", "o", "", "Output file extension. If not specified, then no output is saved.")
+	outfile   = flag.StringP("outfile-ext", "o", "", "Output file extension. If not specified, then no output is saved.")
 	//key       = flag.StringP("key", "k", "", "Use this SSH key to connect")
 	su           = flag.StringP("su", "R", "", "Attempt to su to root with this password, if not root")
 	environment  = flag.StringP("env", "E", "", "Set these variables before running scripts")
@@ -89,7 +91,7 @@ func main() {
 	// Fetch scripts
 	scripts = flag.Args()
 
-	if  len(scripts) == 0 || ( ( *usernames == "" || *targets == "" ) && !*UseConfig ) {
+	if len(scripts) == 0 || ((*usernames == "" || *targets == "") && !*UseConfig) {
 		Err("Missing target(s), script(s), and/or username(s).")
 		fmt.Println("Usage:")
 		flag.PrintDefaults()
@@ -105,7 +107,7 @@ func main() {
 	// We also do a little integrity checking on how password.sh is used
 	// And the validity password.sh
 	UsingPwScript := false
-	pattern := fmt.Sprintf(`([^,]*%s$)`, "password\\.sh") 
+	pattern := fmt.Sprintf(`([^,]*%s$)`, "password\\.sh")
 	regexpPattern, _ := regexp.Compile(pattern)
 	for _, script := range scripts {
 		match := regexpPattern.FindStringSubmatch(script)
@@ -118,10 +120,10 @@ func main() {
 		if !UsingPwScript {
 			Err("YOU ARE CREATING A CONFIG WITHOUT USING PASSWORD.SH. DON'T DO THAT.")
 			os.Exit(1)
-		} 
+		}
 		Info("We are creating a config.json for future coordinate runs")
 	} else {
-		if strings.Contains(strings.Join(environCmds, ","), "YOLO") && UsingPwScript{
+		if strings.Contains(strings.Join(environCmds, ","), "YOLO") && UsingPwScript {
 			Err("YOU ARE YOLOING (Randomizing) PASSWORD CHANGE WITHOUT WRITING A CONFIG. DON'T DO THAT.")
 			os.Exit(1)
 		}
@@ -130,9 +132,8 @@ func main() {
 		if strings.Contains(fileContent, "SSHUSER=\"LOLNONEXISTANTSTRINGHEREBRUH\"") {
 			Err("password.sh might be corrupted.\n")
 			os.Exit(1)
-		} 
+		}
 	}
-	
 
 	if !*yes {
 		reader := bufio.NewReader(os.Stdin)
@@ -237,19 +238,26 @@ func main() {
 			Err(fmt.Sprintf("Error unmarshalling config.json: %s", err))
 			return
 		}
-		if len(ReadConfigEntries) == 0{
+		if len(ReadConfigEntries) == 0 {
 			Err("Config.json has no entries??")
 			return
 		}
 		var wg sync.WaitGroup
-		for _, Entry := range ReadConfigEntries{ 
+		for _, Entry := range ReadConfigEntries {
 			wg.Add(1)
 			go GeraldRunner(Entry.IP, *outfile, &wg, Entry.Username, Entry.Password)
 		}
 		wg.Wait()
 	}
-	
-	if *CreateConfig{
+
+	if len(BrokenHosts) > 0 {
+		Err(fmt.Sprintf("The following hosts had janky ssh and should be configured manually: \n"))
+		for _, host := range BrokenHosts {
+			fmt.Println(host)
+		}
+	}
+
+	if *CreateConfig {
 		Jsonified, err := json.MarshalIndent(ConfigEntries, "", "  ")
 		if err != nil {
 			Err(fmt.Sprintf("Error marshaling JSON while creating config: %s", err))

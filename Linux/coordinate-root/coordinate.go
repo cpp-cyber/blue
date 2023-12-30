@@ -1,12 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -85,7 +85,6 @@ var (
 	environment  = flag.StringP("env", "E", "", "Set these variables before running scripts")
 	quiet        = flag.BoolP("quiet", "q", false, "Print only script output")
 	debug        = flag.BoolP("debug", "d", false, "Print debug messages")
-	yes          = flag.BoolP("yes", "y", false, "Always be yessing")
 	errs         = flag.BoolP("errors", "e", false, "Print errors only (no stdout)")
 	noValidate   = flag.BoolP("no-validate", "n", false, "Don't ensure shell is valid, or that scripts have finished running")
 	CreateConfig = flag.BoolP("create-config", "C", false, "Create a json config for auth. ONLY COMPATIBLE WITH password.sh. This has no error handling. Have fun.")
@@ -123,20 +122,8 @@ func main() {
 		environCmds = strings.Split(*environment, ";")
 	}
 
-	if !*yes {
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Printf("Use The Coordinate? [y/n]: ")
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			Fatal(err)
-		}
-		response = strings.ToLower(strings.TrimSpace(response))
-		if response != "y" && response != "yes" {
-			os.Exit(1)
-		}
-	}
-
 	if *CreateConfig {
+		scripts = nil
 		scripts = append(scripts, "CREATING_CONFIG")
 	}
 	if !*UseConfig {
@@ -184,7 +171,7 @@ func main() {
 			}
 		}
 
-		if !*quiet || !*yes {
+		if !*quiet {
 			fmt.Printf("Specified targets (%d addresses):\n\t%s\n", len(addresses), strings.Join(stringAddresses, "\n\t"))
 			fmt.Printf("Specified scripts (%d files):\n\t%s\n", len(scripts), strings.Join(scripts, "\n\t"))
 			if len(environCmds) != 0 {
@@ -249,6 +236,25 @@ func main() {
 	}
 
 	if *CreateConfig {
+		// If a config exists, just add entries
+		var ReadConfigEntries = []ConfigEntry{}
+		RawConfig, err := os.ReadFile("config.json")
+		if !os.IsNotExist(err) {
+			err = json.Unmarshal(RawConfig, &ReadConfigEntries)
+			if err != nil {
+				Err(fmt.Sprintf("Error unmarshalling config.json: %s", err))
+			}
+		}
+		if len(ReadConfigEntries) > 0 {
+			for _, entry := range ReadConfigEntries {
+				idx := slices.IndexFunc(ConfigEntries, func(c ConfigEntry) bool { return c.IP == entry.IP })
+				if idx == -1 {
+					ConfigEntries = append(ConfigEntries, entry)
+				}
+			}
+		}
+
+		// Parse ConfigEntries
 		Jsonified, err := json.MarshalIndent(ConfigEntries, "", "  ")
 		if err != nil {
 			Err(fmt.Sprintf("Error marshaling JSON while creating config: %s", err))
@@ -258,7 +264,8 @@ func main() {
 			Err("Config Entries are corrupted. Not writing to config.json")
 			return
 		}
-		ioutil.WriteFile("config.json", Jsonified, 0644)
+
+		os.WriteFile("config.json", Jsonified, 0644)
 	}
 
 	if len(AnnoyingErrs) > 0 {

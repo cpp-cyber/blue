@@ -311,6 +311,7 @@ func ssher(i instance, sess *ssh.Session, scriptChan chan string, exitChan chan 
 	if len(difference) == 0 {
 		ManualExit = true
 		Crit(i, "Coordinate stdin is borked on this host!")
+		BrokenHosts = append(BrokenHosts, i.IP)
 		return
 	}
 

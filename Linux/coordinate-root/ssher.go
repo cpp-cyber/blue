@@ -16,41 +16,6 @@ import (
 	"github.com/melbahja/goph"
 )
 
-const (
-	// Running states
-	RUN_WAIT = iota
-	RUN_ACTIVE
-	RUN_ERROR
-	RUN_END
-)
-
-const (
-	RANDSTRLEN = 12
-)
-
-const (
-	// Parsing states
-	NONE = iota
-	IF
-	IF_FALSE
-	ELSE
-	ROULETTE_WAITING
-	ROULETTE_TRUE
-	ROULETTE_RAN
-	OUTPUT_ACTIVE
-)
-
-var (
-	rouletteRoll    int
-	rouletteCounter int
-)
-
-type scriptState struct {
-	Output      bool
-	Conditional uint
-	Roulette    uint
-}
-
 var ExitString string
 
 func isPortOpen(host string, port int) bool {
@@ -91,7 +56,6 @@ func ssherWrapper(i instance, client *goph.Client) {
 		for t := 0; t < *threads && t < len(scripts); t++ {
 			if first {
 				first = false
-			} else {
 			}
 			wg.Add(1)
 			go ssher(i, client, Script, &wg)
@@ -107,53 +71,36 @@ func runner(ip string, outfile string, w *sync.WaitGroup) {
 	var err error
 	var client *goph.Client
 	found := false
-	deadHost := false
 	i := instance{
 		IP:      ip,
 		Outfile: outfile,
 	}
 
-	for _, u := range usernameList {
-		if found || deadHost {
-			break
-		}
-		for _, p := range passwordList {
-			i.Username = u
-			i.Password = p
-			if *debug && *passwords != "" {
-				InfoExtra(i, "Trying password '"+i.Password+"'")
+	if isPortOpen(i.IP, *port) {
+		for _, u := range usernameList {
+			if found {
+				break
 			}
-			if isPortOpen(i.IP, *port) {
-				client, err = goph.NewUnknown(i.Username, i.IP, goph.Password(i.Password))
-				if err != nil && strings.Contains(err.Error(), "Could not connect") {
-					deadHost = true
-					break
-				} else if err != nil {
-					AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Error while connecting to %s: %s", i.IP, err))
+			for _, p := range passwordList {
+				i.Username = u
+				i.Password = p
+				if *debug && *passwords != "" {
+					InfoExtra(i, "Trying password '"+i.Password+"'")
 				}
-				if err == nil {
-					defer client.Close()
+				client, err = goph.NewUnknown(i.Username, i.IP, goph.Password(i.Password))
+				if err != nil {
+					AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Error while connecting to %s: %s", i.IP, err))
+				} else {
 					InfoExtra(i, "Valid credentials for", i.Username)
 					found = true
 					i.Username = u
 					i.Password = p
+					defer client.Close()
 					ssherWrapper(i, client)
 					break
 				}
-			} else {
-				deadHost = true
 			}
 		}
-	}
-
-	if !found {
-		if err != nil && strings.Contains(err.Error(), "Could not connect") {
-			return
-		}
-		if !deadHost {
-			AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Login attempt failed to: %s", i.IP))
-		}
-		return
 	}
 }
 
@@ -161,8 +108,6 @@ func runner(ip string, outfile string, w *sync.WaitGroup) {
 // Nothing like more janky by redefining the runner for individual cred sets
 func GeraldRunner(ip string, outfile string, w *sync.WaitGroup, username string, password string) {
 	defer w.Done()
-
-	var err error
 
 	found := false
 	deadHost := false
@@ -175,9 +120,7 @@ func GeraldRunner(ip string, outfile string, w *sync.WaitGroup, username string,
 
 	if isPortOpen(i.IP, *port) {
 		client, err := goph.NewUnknown(i.Username, i.IP, goph.Password(i.Password))
-		if err != nil && strings.Contains(err.Error(), "Could not connect") {
-			deadHost = true
-		} else if err != nil {
+		if err != nil {
 			AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Error while connecting to %s: %s", i.IP, err))
 		}
 		if err == nil {
@@ -189,13 +132,9 @@ func GeraldRunner(ip string, outfile string, w *sync.WaitGroup, username string,
 	}
 
 	if !found {
-		if err != nil && strings.Contains(err.Error(), "Could not connect") {
-			return
-		}
 		if !deadHost {
 			AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Login attempt failed to: %s", i.IP))
 		}
-		return
 	}
 }
 func ssher(i instance, client *goph.Client, script string, wg *sync.WaitGroup) {
