@@ -117,9 +117,12 @@ func GeraldRunner(ip string, outfile string, w *sync.WaitGroup, username string,
 		Username: username,
 		Password: password,
 	}
+	DebugExtra(i, "Starting!")
 
 	if isPortOpen(i.IP, *port) {
+		DebugExtra(i, "Port is open, logging in!")
 		client, err := goph.NewUnknown(i.Username, i.IP, goph.Password(i.Password))
+		DebugExtra(i, "SSH has been dialed")
 		if err != nil {
 			AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Error while connecting to %s: %s", i.IP, err))
 		}
@@ -191,7 +194,7 @@ func ssher(i instance, client *goph.Client, script string, wg *sync.WaitGroup) {
 		}
 	}
 	if len(stroutput) > 0 {
-		Stdout(i, fmt.Sprintf("%s\n", stroutput))
+		Stdout(i, fmt.Sprintf("%s", stroutput))
 		if *CreateConfig {
 			for _, line := range strings.Split(stroutput, "\n") {
 				if strings.Split(line, ",")[0] == i.Username {
