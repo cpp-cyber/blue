@@ -2,9 +2,7 @@ package main
 
 import (
 	"WebService/models"
-	"fmt"
 	"log"
-	"net"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -12,21 +10,7 @@ import (
 
 var HostCount int
 
-var privateIPBlocks []*net.IPNet
-
 func main() {
-
-	for _, cidr := range []string{
-		"10.0.0.0/8",     // RFC1918
-		"172.16.0.0/12",  // RFC1918
-		"192.168.0.0/16", // RFC1918
-	} {
-		_, block, err := net.ParseCIDR(cidr)
-        if err != nil {
-			panic(fmt.Errorf("parse error on %q: %v", cidr, err))
-		}
-		privateIPBlocks = append(privateIPBlocks, block)
-	}
 
 	router := gin.Default()
 	router.LoadHTMLGlob("templates/*")

@@ -10,6 +10,9 @@
 
 <body>
 
+    <input type="search" id="filter" onkeypress="if (event.keyCode === 13) filter()" />
+    <button onclick="filter()">Search</button>
+
   <div class="md:flex flex-col md:flex-row md:min-h-screen w-full max-w-screen-xl mx-auto">
     <div id="navSide" class="flex flex-col w-full md:w-48 text-gray-700 bg-white flex-shrink-0"></div>
     <script src="./assets/js/go.js"></script>
@@ -23,10 +26,10 @@
   </div>
 </body>
 
-<script id="code">
-  var nodeDataArray = [];
-  var linkDataArray = [];
-  function init() {
+    <script id="code">
+    var nodeDataArray = [];
+    var linkDataArray = [];
+    function init() {
     const $ = go.GraphObject.make;
     myDiagram = new go.Diagram("myDiagramDiv",
       {
@@ -41,9 +44,9 @@
       $(go.Node, "Auto",
         { locationSpot: go.Spot.Center },
         $(go.Shape, "Circle",
-          { fill: $(go.Brush, "Linear", { 0: "rgb(254, 201, 0)", 1: "rgb(254, 162, 0)" }), stroke: "black" }),
+          { fill: $(go.Brush, "Linear", { 0: "rgb(255, 255, 255)", 1: "rgb(255, 255, 255)" }), stroke: "black" }),
         $(go.TextBlock,
-          { font: "bold 12pt helvetica, bold arial, sans-serif", margin: 4 },
+          { font: "bold 10pt helvetica, bold arial, sans-serif", margin: 1 },
           new go.Binding("text", "text"))
       );
 
@@ -74,7 +77,7 @@
           $(go.TextBlock, "transition",
             {
               textAlign: "center",
-              font: "9pt helvetica, arial, sans-serif",
+              font: "12pt helvetica, arial, sans-serif",
               margin: 8,
               editable: true
             },
@@ -82,46 +85,76 @@
           )
         ));
 
-    GetHosts();
-    GetConnections();
-
-    myDiagram.model = new go.GraphLinksModel(nodeDataArray, linkDataArray);
-  }
-
-  function GetHosts() {
-    var xhttp = new XMLHttpRequest();
-    xhttp.onreadystatechange = function () {
-      if (this.readyState == 4 && this.status == 200) {
-        var hosts = JSON.parse(this.responseText);
-        var i = 1;
-        Object.keys(hosts).forEach(key => {
-          nodeDataArray.push({ key: key, text: hosts[key] });
-          i++;
-        });
+        GetHosts();
+        GetConnections();
         myDiagram.model = new go.GraphLinksModel(nodeDataArray, linkDataArray);
-      }
-    };
-    xhttp.open("GET", "http://localhost/api/hosts", true);
-    xhttp.send();
-  }
+    }
 
-  function GetConnections() {
-    var xhttp = new XMLHttpRequest();
-    xhttp.onreadystatechange = function () {
-      if (this.readyState == 4 && this.status == 200) {
-        var connections = JSON.parse(this.responseText);
-        var i = 1;
-        Object.keys(connections).forEach(key => {
-          linkDataArray.push({ from: connections[key][0], to: connections[key][1], text: connections[key][2] });
-          i++;
-        });
-        myDiagram.model = new go.GraphLinksModel(nodeDataArray, linkDataArray);
-      }
-    };
-    xhttp.open("GET", "http://localhost/api/connections", true);
-    xhttp.send();
-  }
-  window.addEventListener('DOMContentLoaded', init);
+    function GetHosts() {
+        var filterParam = new URLSearchParams(window.location.search);
+        var filter = filterParam.get('hostname');
+        if (filter == null) {
+          filter = "";
+        }
+        var url = "http://localhost/api/hosts/" + filter;
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function () {
+          if (this.readyState == 4 && this.status == 200) {
+            var hosts = JSON.parse(this.responseText);
+            var i = 1;
+            Object.keys(hosts).forEach(key => {
+              nodeDataArray.push({ key: key, text: hosts[key].split(',')[0] + "\n" + hosts[key].split(',')[1] });
+              i++;
+            });
+            myDiagram.model = new go.GraphLinksModel(nodeDataArray, linkDataArray);
+          };
+        };
+          xhttp.open("GET", url, true);
+          xhttp.send();
+    }
+
+    function GetConnections() {
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function () {
+          if (this.readyState == 4 && this.status == 200) {
+            var connections = JSON.parse(this.responseText);
+            var i = 1;
+            Object.keys(connections).forEach(key => {
+              linkDataArray.push({ from: connections[key][0], to: connections[key][1], text: connections[key][2] });
+              i++;
+            });
+            myDiagram.model = new go.GraphLinksModel(nodeDataArray, linkDataArray);
+          }
+        };
+        xhttp.open("GET", "http://localhost/api/connections", true);
+        xhttp.send();
+    }
+
+    function filter() {
+        var filter = document.getElementById("filter");
+        if (!filter) return;
+        myDiagram.focus();
+        myDiagram.startTransaction("highlight search");
+
+        if (filter.value) {
+            var safe = filter.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            var regex = new RegExp(safe, 'i');
+            var results = myDiagram.findNodesByExample({ text: regex });
+            console.log(results);
+            myDiagram.highlightCollection(results);
+
+            if (results.count > 0) {
+                myDiagram.centerRect(results.first().actualBounds);
+            } else {
+                myDiagram.clearHighlighteds();
+            }
+
+            myDiagram.commitTransaction("highlight search");
+        }
+    }
+
+
+    window.addEventListener('DOMContentLoaded', init);
 </script>
 
 </html>
