@@ -2,7 +2,6 @@ package main
 
 import (
 	"WebService/models"
-    "fmt"
 
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
@@ -17,9 +16,9 @@ func connectToSQLite() (*gorm.DB, error) {
 	return db, nil
 }
 
-func createHost(db *gorm.DB, ip, hostname string) error {
-	host := models.Host{IP: ip, ID: HostCount, Hostname: hostname}
-    result := db.Create(&host)
+func createHost(db *gorm.DB, ip string) error {
+	host := models.Host{IP: ip, ID: HostCount}
+	result := db.Create(&host)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -28,7 +27,6 @@ func createHost(db *gorm.DB, ip, hostname string) error {
 }
 
 func createConnection(db *gorm.DB, src, dst, port int) error {
-
 	id := uuid.New().String()
 
 	connection := models.Connection{ID: id, Src: src, Dst: dst, Port: port}
@@ -39,19 +37,9 @@ func createConnection(db *gorm.DB, src, dst, port int) error {
 	return nil
 }
 
-func updateHost(db *gorm.DB, ip, hostname string) error {
-    host := models.Host{IP: ip, Hostname: hostname}
-    result := db.Model(&host).Update("hostname", hostname)
-    if result.Error != nil {
-        return result.Error
-    }
-    return nil
-}
-
-func getHostsEntries(db *gorm.DB, filter string) ([]models.Host, error) {
+func getHostsEntries(db *gorm.DB) ([]models.Host, error) {
 	var hosts []models.Host
-	result := db.Where("hostname LIKE ?", filter).Find(&hosts)
-    fmt.Println(filter)
+	result := db.Find(&hosts)
 	if result.Error != nil {
 		return nil, result.Error
 	}

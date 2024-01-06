@@ -4,16 +4,11 @@ import (
 	"WebService/models"
 	"net/http"
 	"strconv"
-    "fmt"
 
 	"github.com/gin-gonic/gin"
 )
 
 func GetHosts(c *gin.Context) {
-    filter := c.Request.URL.Query().Get("hostname")
-    if filter == "" {
-        filter = "%"
-    }
 
 	db, err := connectToSQLite()
 	if err != nil {
@@ -21,15 +16,15 @@ func GetHosts(c *gin.Context) {
 		return
 	}
 
-	hosts, err := getHostsEntries(db, filter)
+	hosts, err := getHostsEntries(db)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-    
+
 	hostMap := make(map[int]string)
 	for _, host := range hosts {
-        hostMap[host.ID] = host.IP + "," + host.Hostname
+		hostMap[host.ID] = host.IP
 	}
 
 	c.JSON(http.StatusOK, hostMap)
@@ -64,7 +59,6 @@ func AddHost(c *gin.Context) {
 	}
 
 	ip := jsonData.IP
-    hostname := jsonData.Hostname
 
 	db, err := connectToSQLite()
 	if err != nil {
@@ -72,7 +66,7 @@ func AddHost(c *gin.Context) {
 		return
 	}
 
-	err = createHost(db, ip, hostname)
+	err = createHost(db, ip)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -91,7 +85,6 @@ func AddConnection(c *gin.Context) {
 	src := jsonData["Src"].(string)
 	dst := jsonData["Dst"].(string)
 	port := jsonData["Port"].(string)
-    hostname := jsonData["Hostname"].(string)
 
 	portInt, err := strconv.Atoi(port)
 	if err != nil || portInt < 0 || portInt > 65535 {
@@ -110,16 +103,13 @@ func AddConnection(c *gin.Context) {
 
 	tx := db.First(&srcHost, "IP = ?", src)
 	if tx.Error != nil {
-		createHost(db, src, hostname)
+		createHost(db, src)
 		db.First(&srcHost, "IP = ?", src)
-	} else if srcHost.Hostname == "" {
-        fmt.Println("Updating hostname" + hostname)
-        updateHost(db, src, hostname)
-    }
+	}
 
 	tx = db.First(&dstHost, "IP = ?", dst)
 	if tx.Error != nil {
-		createHost(db, dst, "")
+		createHost(db, dst)
 		db.First(&dstHost, "IP = ?", dst)
 	}
 
@@ -137,4 +127,3 @@ func AddConnection(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
-

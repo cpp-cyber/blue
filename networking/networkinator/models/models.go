@@ -1,9 +1,8 @@
 package models
 
 type Host struct {
-    IP       string `gorm:"primaryKey"`
-	ID       int
-    Hostname string
+	IP string `gorm:"primaryKey"`
+	ID int
 }
 
 type Connection struct {
