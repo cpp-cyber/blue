@@ -9,15 +9,21 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+    "flag"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 )
 
+var ignore []*net.IPNet
 var privateIPBlocks []*net.IPNet
+var SERVER_IP *string
 
 func main() {
+    SERVER_IP = flag.String("server", "", "Server IP")
+    flag.Parse()
+
 	f, err := os.OpenFile("network-agent.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
@@ -27,9 +33,19 @@ func main() {
 	log.SetOutput(f)
 
 	for _, cidr := range []string{
-		"10.0.0.0/8",     // RFC1918
-		"172.16.0.0/12",  // RFC1918
-		"192.168.0.0/16", // RFC1918
+		"224.0.0.0/3",
+	} {
+		_, block, err := net.ParseCIDR(cidr)
+		if err != nil {
+			log.Printf("parse error on %q: %v", cidr, err)
+		}
+		ignore = append(ignore, block)
+	}
+
+	for _, cidr := range []string{
+		"10.0.0.0/8",
+        "172.12.0.0/12",
+        "192.168.0.0/16",
 	} {
 		_, block, err := net.ParseCIDR(cidr)
 		if err != nil {
@@ -84,8 +100,8 @@ func capturePackets(iface string) {
 			srcIP = packetNetworkInfo.NetworkFlow().Src().String()
 			dstIP = packetNetworkInfo.NetworkFlow().Dst().String()
 
-			if !isPrivateIP(srcIP) || !isPrivateIP(dstIP) || dstIP == os.Getenv("SERVER_IP") || srcIP == os.Getenv("SERVER_IP") {
-				continue
+			if !ipIsInBlock(dstIP, privateIPBlocks) || ipIsInBlock(srcIP, ignore) || ipIsInBlock(dstIP, ignore) || dstIP == *SERVER_IP || srcIP == *SERVER_IP {
+		        continue
 			}
 
 		}
@@ -124,22 +140,20 @@ func capturePackets(iface string) {
 			}
 
 			postData := bytes.NewBuffer(jsonData)
-
-			http.Post("http://"+os.Getenv("SERVER_IP")+"/api/connections", "application/json", postData)
+            postUrl := "http://"+*SERVER_IP+"/api/connections"
+			http.Post(postUrl, "application/json", postData)
 
 		}
 	}
 }
 
-func isPrivateIP(ip string) bool {
-
+func ipIsInBlock(ip string, block []*net.IPNet) bool {
 	ipAddr := net.ParseIP(ip)
 	if ipAddr == nil {
 		log.Println("Invalid IP address")
 		return false
 	}
-
-	for _, block := range privateIPBlocks {
+	for _, block := range block {
 		if block.Contains(ipAddr) {
 			return true
 		}
