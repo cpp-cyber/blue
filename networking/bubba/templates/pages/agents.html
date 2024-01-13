@@ -5,47 +5,12 @@
         </div>
     </div>
 
+<script src="./assets/js/statusWS.js"></script>
 <script>
     $(document).ready(function () {
         GetAgents();
     });
 
-    url = 'ws://localhost/ws/agent/web';
-    var socket = new WebSocket(url);
-
-    socket.onmessage = function(event) {
-        var message = event.data;
-        var data = JSON.parse(message);
-        if (typeof data.ID !== 'undefined') {
-            if (data.Status === "Alive") {
-                if (document.getElementById(data.ID) === null) {
-                    GetAgents();
-                }
-                AgentUp(data.ID);
-            } else if (data.Status === "Dead") {
-                AgentDown(data.ID);
-            } else {
-                console.log("Unknown status: ", data);
-            }
-        } else {
-            console.log("Unknown message: ", data);
-        }
-    };
-
-    socket.onopen = function(event) {
-        console.log("Connection established!");
-    };
-
-    socket.onerror = function(error) {
-        console.log("WebSocket Error: ", error);
-    };
-
-    socket.onclose = function(event) {
-        console.log("Connection closed!");
-    };
-
-
-    var cardCount = 0;
     function GetAgents() {
         $.ajax({
             url: "/api/agents/get",
@@ -55,7 +20,6 @@
                 for (var i = 0; i < data.length; i++) {
                     if (document.getElementById(data[i][3]) === null) {
                         AddAgentCard(data[i][0], data[i][1], data[i][2], data[i][3]);
-                        cardCount++;
                     }
                 }
             },

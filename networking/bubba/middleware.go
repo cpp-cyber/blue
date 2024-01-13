@@ -4,80 +4,67 @@ import (
     "fmt"
     "net/http"
     "strings"
+    "encoding/json"
+    "strconv"
 
     "github.com/gin-gonic/gin"
     "github.com/gorilla/websocket"
 )
 
-func ws(c *gin.Context) {
+func wsAgent(c *gin.Context) {
     conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
-
-    clients[conn] = true
-
-    go handleAgentConnectionSocket(conn)
+    agentClients[conn] = true
+    go handleAgentSocket(conn)
 }
 
-func wsAgentStatus(c *gin.Context) {
+func wsWeb(c *gin.Context) {
     conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
-
-    agentStatusClients[conn] = true
-
-    go handleAgentStatusSocket(conn)
+    webClients[conn] = true
+    go handleWebSocket(conn)
 }
 
-func GetAgentStatus(c *gin.Context) {
-    conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-
-    webStatusClients[conn] = true
-
-    go handleWebStatusSocket(conn)
-}
-
-func handleWebStatusSocket(conn *websocket.Conn) {
+func handleWebSocket(conn *websocket.Conn) {
     for {
-        _, _, err := conn.ReadMessage()
+        _, msg, err := conn.ReadMessage()
         if err != nil {
             fmt.Println(err)
             conn.Close()
-            delete(webStatusClients, conn)
+            delete(webClients, conn)
             break
+        }
+
+        jsonData := make(map[string]interface{})
+        err = json.Unmarshal(msg, &jsonData)
+        if err != nil {
+            fmt.Println(err)
+            return
+        }
+
+        opCode := jsonData["OpCode"].(float64)
+
+        switch opCode {
+            case 1:
+            default:
+                fmt.Println("Unknown OpCode")
         }
     }
 }
 
-func handleAgentConnectionSocket(conn *websocket.Conn) {
-  for {
-    _, msg, err := conn.ReadMessage()
-    if err != nil {
-      fmt.Println(err)
-      conn.Close()
-      delete(clients, conn)
-      break
-    }
-    AddConnection(msg)
-  }
-}
-
-func handleAgentStatusSocket(conn *websocket.Conn) {
+func handleAgentSocket(conn *websocket.Conn) {
     for {
         _, msg, err := conn.ReadMessage()
         if err != nil {
             fmt.Println(err)
 
             deadClient := strings.Split(conn.NetConn().RemoteAddr().String(), ":")[0]
-
             deadAgent, err := GetAgentByIP(deadClient)
             if err != nil {
                 fmt.Println(err)
@@ -85,15 +72,36 @@ func handleAgentStatusSocket(conn *websocket.Conn) {
             }
 
             jsonData := []byte(fmt.Sprintf(`{"ID": "%s", "Status": "Dead"}`, deadAgent.ID))
-            for client := range webStatusClients {
+            for client := range webClients {
                 client.WriteMessage(websocket.TextMessage, jsonData)
-                UpdateAgentStatus(deadClient, "Dead")
             }
 
             conn.Close()
-            delete(agentStatusClients, conn)
+            delete(agentClients, conn)
             break
         }
-        AgentStatus(msg)
+
+        jsonData := make(map[string]interface{})
+        err = json.Unmarshal(msg, &jsonData)
+        if err != nil {
+            fmt.Println(err)
+            return
+        }
+
+        opCode := jsonData["OpCode"].(float64)
+
+        switch opCode {
+            case 0:
+                jsonData := []byte(fmt.Sprintf(`{"ID": "%s", "Status": "Alive"}`, strconv.FormatFloat(jsonData["ID"].(float64), 'f', -1, 64)))
+                AgentStatus(jsonData)
+            case 5:
+                AddConnection(jsonData)
+            case 6:
+                id := jsonData["ID"].(string)
+                count := jsonData["Count"].(float64)
+                UpdateConnectionCount(id, count)
+            default:
+                fmt.Println("Unknown OpCode")
+        }
     }
 }

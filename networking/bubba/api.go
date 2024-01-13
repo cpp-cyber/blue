@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"networkinator/models"
@@ -21,23 +20,18 @@ func GetConnections(c *gin.Context) {
 
     connectionMap := make(map[string][]string)
     for _, connection := range connections {
-        connectionMap[connection.ID] = []string{connection.Src, connection.Dst, strconv.Itoa(connection.Port), strconv.Itoa(connection.Count)}
+        connectionMap[connection.ID] = []string{connection.Src, connection.Dst, strconv.Itoa(connection.Port), strconv.FormatFloat(connection.Count, 'f', -1, 64)}
     }
 
     c.JSON(http.StatusOK, connectionMap)
 }
 
-func AddConnection(input []byte) {
-    jsonData := make(map[string]interface{})
-    err := json.Unmarshal(input, &jsonData)
-    if err != nil {
-        fmt.Println(err)
-        return
-    }
-
-	src := jsonData["Src"].(string)
-	dst := jsonData["Dst"].(string)
-	port := jsonData["Port"].(string)
+func AddConnection(jsonData map[string]interface{}) {
+    id := jsonData["ID"].(string)
+    src := jsonData["Src"].(string)
+    dst := jsonData["Dst"].(string)
+    port := jsonData["Port"].(string)
+    count := jsonData["Count"].(float64)
 
 	portInt, err := strconv.Atoi(port)
 	if err != nil || portInt < 0 || portInt > 65535 {
@@ -46,24 +40,24 @@ func AddConnection(input []byte) {
 	}
 
     connection := models.Connection{}
-    tx := db.First(&connection, "Src = ? AND Dst = ? AND Port = ?", src, dst, portInt)
+    tx := db.First(&connection, "ID = ?", id)
 	if tx.Error == nil {
-        IncrementConnectionCount(connection.ID)
+        fmt.Println("Connection already exists")
 		return
 	}
 
-	err = AddConnectionToDB(src, dst, portInt, 1)
+	err = AddConnectionToDB(id, src, dst, portInt, count)
 	if err != nil {
         fmt.Println(err)
 		return
 	}
 
-    for client := range clients {
+    for client := range webClients {
         err := client.WriteJSON(jsonData)
         if err != nil {
             fmt.Println(err)
             client.Close()
-            delete(clients, client)
+            delete(webClients, client)
         }
     }
 }
@@ -79,8 +73,6 @@ func GetAgents(c *gin.Context) {
     for i := 0; i < len(agents); i++ {
         agentArr[i] = []string{agents[i].Hostname, agents[i].HostOS, agents[i].IP, agents[i].ID}
     }
-
-    fmt.Println(agentArr)
 
     c.JSON(http.StatusOK, agentArr)
 }
@@ -114,13 +106,13 @@ func AddAgent(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"message": "Agent added"})
 }
 
-func AgentStatus(input []byte) {
-    for client := range webStatusClients {
-        err := client.WriteMessage(websocket.TextMessage, input)
+func AgentStatus(jsonData []byte) {
+    for client := range webClients {
+        err := client.WriteMessage(websocket.TextMessage, jsonData)
         if err != nil {
             fmt.Println(err)
             client.Close()
-            delete(clients, client)
+            delete(webClients, client)
         }
     }
 }

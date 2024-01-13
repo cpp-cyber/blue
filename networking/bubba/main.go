@@ -10,16 +10,15 @@ import (
 
 var HostCount int
 
-var clients = make(map[*websocket.Conn]bool)
-var agentStatusClients = make(map[*websocket.Conn]bool)
-var webStatusClients = make(map[*websocket.Conn]bool)
+var agentClients = make(map[*websocket.Conn]bool)
+var webClients = make(map[*websocket.Conn]bool)
 var db = ConnectToSQLite()
 
 
 func main() {
 
 	router := gin.Default()
-	router.LoadHTMLGlob("templates/*")
+	router.LoadHTMLGlob("templates/**/*")
 	router.MaxMultipartMemory = 8 << 20 // 8 MiB
 	router.Static("/assets", "./assets/")
 
