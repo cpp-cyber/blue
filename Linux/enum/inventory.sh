@@ -137,15 +137,27 @@ checkService()
 
     if [ -n "$serviceAlias" ]; then
         echo -e "\n${BLUE}[+] $serviceToCheckExists is on this machine${NC}\n"
-        if echo "$serviceList" | grep -qi "$serviceAlias" ; then
-            if [ "$( DPRINT netstat -tulpn | grep -i \"$serviceAlias\" )" ] || [ "$( DPRINT ss -blunt -p | grep -i "$serviceAlias" )" ]; then
-                echo -e "Active on port(s) ${YELLOW}$(netstat -tulpn | grep -i $serviceAlias | awk 'BEGIN {ORS=" and "} {print $1, $4}' | sed 's/\(.*\)and /\1\n/')${NC}\n"
+        if echo "$serviceList" | grep -qi "$serviceAlias\|$serviceToCheckExists" ; then
+            if [ "$( DPRINT netstat -tulpn | grep -i $serviceAlias )" ] ; then
+                
+                echo -e "Active on port(s) ${YELLOW}$(netstat -tulpn | grep -i "$serviceAlias\|$serviceToCheckExists"| awk 'BEGIN {ORS=" and "} {print $1, $4}' | sed 's/\(.*\)and /\1\n/')${NC}\n"
+            
+            elif [ "$( DPRINT ss -blunt -p | grep -i $serviceAlias )" ] ; then
+                
+                echo -e "Active on port(s) ${YELLOW}$(ss -blunt -p | grep -i "$serviceAlias\|$serviceToCheckExists"| awk 'BEGIN {ORS=" and " } {print $1,$5}' | sed 's/\(.*\)and /\1\n/')${NC}\n"
             fi
-        fi
+
+        fi 
     elif echo "$serviceList" | grep -qi "$serviceToCheckExists" ; then
         echo -e "\n${BLUE}[+] $serviceToCheckExists is on this machine${NC}\n"
-        if [ "$( DPRINT netstat -tulpn | grep -i \"$serviceToCheckExists\" )" ] || [ "$( DPRINT ss -blunt -p | grep -i "$serviceToCheckExists" )" ]; then
-            echo -e "Active on port(s) ${YELLOW}$( DPRINT netstat -tulpn | grep -i $serviceToCheckExists | awk 'BEGIN {ORS=" and "} {print $1, $4}' | sed 's/\(.*\)and /\1\n/')${NC}\n"
+
+        if [ "$( DPRINT netstat -tulpn | grep -i $serviceToCheckExists )" ] ; then
+                
+                echo -e "Active on port(s) ${YELLOW}$(netstat -tulpn | grep -i $serviceToCheckExists| awk 'BEGIN {ORS=" and "} {print $1, $4}' | sed 's/\(.*\)and /\1\n/')${NC}\n"
+        
+        elif [ "$( DPRINT ss -blunt -p | grep -i $serviceToCheckExists )" ] ; then
+                
+                echo -e "Active on port(s) ${YELLOW}$(ss -blunt -p | grep -i $serviceToCheckExists| awk 'BEGIN {ORS=" and " } {print $1,$5}' | sed 's/\(.*\)and /\1\n/')${NC}\n"
         fi
     fi
 }
@@ -285,9 +297,9 @@ if checkService "$SERVICES"  'mysql' | grep -qi "is on this machine"; then
     sql_test
 fi
 
-if checkService "$SERVICES"  'mariadb' | grep -qi "is on this machine"; then 
+if checkService "$SERVICES"  'mariadb' 'mysql' | grep -qi "is on this machine"; then 
     MARIADB=true
-    checkService "$SERVICES"  'mariadb' 
+    checkService "$SERVICES"  'mariadb' 'mysql'
     sql_test
 fi
 
