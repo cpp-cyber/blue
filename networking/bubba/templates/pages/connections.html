@@ -1,0 +1,49 @@
+{{ template "Header" }}
+<div class="container-fluid" style="width:75%">
+    <table id="data-table" class="table table-striped" >
+        <thead>
+            <tr>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Port</th>
+                <th>Count</th>
+            </tr>
+        </thead>
+        <tbody id="connections">
+        </tbody>
+    </table>
+</div>
+
+<script>
+
+    $(document).ready(function () {
+        getConnections();
+    });
+
+    function getConnections() {
+        $.ajax({
+            url: "/api/connections/get",
+            type: "GET",
+            success: function (data) {
+                let dataArray = Object.keys(data).map(key => [key, data[key]]);
+                var i = 1;
+                Object.keys(data).forEach(key => {
+                    var src = data[key][0];
+                    var dst = data[key][1];
+                    var port = data[key][2];
+                    var count = data[key][3];
+                    $("#connections").append("<tr><td>" + src + "</td><td>" + dst + "</td><td>" + port + "</td><td>" + count + "</td></tr>");
+                    i++;
+                });
+
+                $("#hosts").html(data);
+                $('#data-table').DataTable();
+            },
+            error: function (error) {
+                console.log(error);
+            }
+        });
+    }
+
+</script>
+{{ template "Footer" }}
