@@ -6,6 +6,7 @@ import (
     "strings"
     "encoding/json"
     "strconv"
+    "log"
 
     "github.com/gin-gonic/gin"
     "github.com/gorilla/websocket"
@@ -35,7 +36,7 @@ func handleWebSocket(conn *websocket.Conn) {
     for {
         _, msg, err := conn.ReadMessage()
         if err != nil {
-            fmt.Println(err)
+            log.Println(err)
             conn.Close()
             delete(webClients, conn)
             break
@@ -44,7 +45,7 @@ func handleWebSocket(conn *websocket.Conn) {
         jsonData := make(map[string]interface{})
         err = json.Unmarshal(msg, &jsonData)
         if err != nil {
-            fmt.Println(err)
+            log.Println(err)
             return
         }
 
@@ -53,7 +54,7 @@ func handleWebSocket(conn *websocket.Conn) {
         switch opCode {
             case 1:
             default:
-                fmt.Println("Unknown OpCode")
+                log.Println("Unknown OpCode")
         }
     }
 }
@@ -62,12 +63,12 @@ func handleAgentSocket(conn *websocket.Conn) {
     for {
         _, msg, err := conn.ReadMessage()
         if err != nil {
-            fmt.Println(err)
+            log.Println(err)
 
             deadClient := strings.Split(conn.NetConn().RemoteAddr().String(), ":")[0]
             deadAgent, err := GetAgentByIP(deadClient)
             if err != nil {
-                fmt.Println(err)
+                log.Println(err)
                 return
             }
 
@@ -84,7 +85,7 @@ func handleAgentSocket(conn *websocket.Conn) {
         jsonData := make(map[string]interface{})
         err = json.Unmarshal(msg, &jsonData)
         if err != nil {
-            fmt.Println(err)
+            log.Println(err)
             return
         }
 
@@ -101,7 +102,7 @@ func handleAgentSocket(conn *websocket.Conn) {
                 count := jsonData["Count"].(float64)
                 UpdateConnectionCount(id, count)
             default:
-                fmt.Println("Unknown OpCode")
+                log.Println("Unknown OpCode")
         }
     }
 }

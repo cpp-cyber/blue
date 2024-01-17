@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 	"networkinator/models"
 	"strconv"
@@ -35,27 +35,27 @@ func AddConnection(jsonData map[string]interface{}) {
 
 	portInt, err := strconv.Atoi(port)
 	if err != nil || portInt < 0 || portInt > 65535 {
-        fmt.Println(err)
+        log.Println(err)
 		return
 	}
 
     connection := models.Connection{}
     tx := db.First(&connection, "ID = ?", id)
 	if tx.Error == nil {
-        fmt.Println("Connection already exists")
+        log.Println("Connection already exists")
 		return
 	}
 
 	err = AddConnectionToDB(id, src, dst, portInt, count)
 	if err != nil {
-        fmt.Println(err)
+        log.Println(err)
 		return
 	}
 
     for client := range webClients {
         err := client.WriteJSON(jsonData)
         if err != nil {
-            fmt.Println(err)
+            log.Println(err)
             client.Close()
             delete(webClients, client)
         }
@@ -110,7 +110,7 @@ func AgentStatus(jsonData []byte) {
     for client := range webClients {
         err := client.WriteMessage(websocket.TextMessage, jsonData)
         if err != nil {
-            fmt.Println(err)
+            log.Println(err)
             client.Close()
             delete(webClients, client)
         }
