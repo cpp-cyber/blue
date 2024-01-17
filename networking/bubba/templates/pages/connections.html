@@ -7,6 +7,7 @@
                 <th>Destination</th>
                 <th>Port</th>
                 <th>Count</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody id="connections">
@@ -14,10 +15,40 @@
     </table>
 </div>
 
+<div class="modal fade" id="ipModal" tabindex="1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ipTitle"></h5>
+            </div>
+            <div class="modal-body row" id="actionList">
+            </div>
+            <div class="modal-footer">
+                <button id="closeButton" type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="./assets/js/connectionsWS.js"></script>
 <script>
 
     $(document).ready(function () {
         getConnections();
+    });
+
+    $(document).on('click', '.btn-primary', function() {
+        $('#ipModal').modal('show');
+        var ip = $(this).text();
+        var key = $(this).closest('tr').attr('id');
+        $('#ipTitle').html(ip);
+        var addFilter = '<button type="button" class="btn btn-secondary mr-1 mb-1" onClick="addFilter(\'' + ip + '/32\')">Add Filter</button>';
+        var removeFilter = '<button type="button" class="btn btn-secondary mr-1 mb-1" onClick="removeFilter(\'' + ip + '/32\')">Remove Filter</button>';
+        $('#actionList').html(addFilter + removeFilter);
+    });
+
+    $("#closeButton").on('click', function() {
+        $('#ipModal').modal('hide');
     });
 
     function getConnections() {
@@ -25,6 +56,7 @@
             url: "/api/connections/get",
             type: "GET",
             success: function (data) {
+                console.log(data);
                 let dataArray = Object.keys(data).map(key => [key, data[key]]);
                 var i = 1;
                 Object.keys(data).forEach(key => {
@@ -32,17 +64,64 @@
                     var dst = data[key][1];
                     var port = data[key][2];
                     var count = data[key][3];
-                    $("#connections").append("<tr><td>" + src + "</td><td>" + dst + "</td><td>" + port + "</td><td>" + count + "</td></tr>");
+                    var deleteConnection = '<button type="button" class="btn btn-secondary mr-1 mb-1" onClick="deleteConnection(\'' + key + '\')">Delete Connection</button>';
+                    $("#connections").append("<tr id=" + 
+                        key + "><td>" + 
+                        src + "</td><td>" + 
+                        dst + "</td><td>" + 
+                        port + "</td><td>" + 
+                        count + "</td><td>" +
+                        deleteConnection + "</td></tr>");
                     i++;
                 });
 
                 $("#hosts").html(data);
-                $('#data-table').DataTable();
+                $('#data-table').DataTable({
+                    "columnDefs": [
+                        {
+                            targets: [0,1],
+                            render: function (data, type, row) {
+                                return $('<button>')
+                                    .attr('class', 'btn btn-primary')
+                                    .attr('data-toggle', 'modal')
+                                    .attr('data-target', '#ipModal')
+                                    .text(data)
+                                    .wrap('<div></div>')
+                                    .parent()
+                                    .html();
+                            }
+                        }
+                    ]
+
+                });
             },
             error: function (error) {
                 console.log(error);
             }
         });
+    }
+
+    function addFilter(data) {
+        socket.send(JSON.stringify({
+            "OpCode": 1,
+            "CIDR": data
+        }));
+    }
+
+    function removeFilter(data) {
+        socket.send(JSON.stringify({
+            "OpCode": 2,
+            "CIDR": data
+        }));
+    }
+
+    function deleteConnection(data) {
+        console.log(data);
+        socket.send(JSON.stringify({
+            "OpCode": 3,
+            "ID": data
+        }));
+        $('#' + data).remove();
     }
 
 </script>

@@ -16,6 +16,7 @@ import (
     "strings"
     "sync"
     "time"
+    "bufio"
 
     "github.com/google/gopacket"
     "github.com/google/gopacket/layers"
@@ -39,6 +40,18 @@ var (
 )
 
 func main() {
+    r := bufio.NewReader(os.Stdin)
+    buf := make([]byte, 0, 1024)
+    n, err := r.Read(buf[:cap(buf)])
+    buf = buf[:n]
+    key := string(buf)
+
+    if runtime.GOOS == "windows" {
+        key = strings.TrimRight(key, "\r\n")
+    } else {
+        key = strings.TrimRight(key, "\n")
+    }
+
     SERVER_IP = flag.String("server", "", "Server IP")
     flag.Parse()
 
@@ -49,15 +62,6 @@ func main() {
     defer f.Close()
     log.SetOutput(f)
 
-    for _, cidr := range []string{
-        "224.0.0.0/3",
-    } {
-        _, block, err := net.ParseCIDR(cidr)
-        if err != nil {
-            log.Printf("parse error on %q: %v", cidr, err)
-        }
-        ignore = append(ignore, block)
-    }
 
     log.Println("Starting up...")
 
@@ -66,13 +70,16 @@ func main() {
         log.Println(err)
     }
 
+    appendFilter("224.0.0.0/3")
+
     hostHash := fmt.Sprint(hash(hostname))
-    RegisterAgent(hostHash)
+    RegisterAgent(hostHash, key)
 
     conn := initializeWebSocket(*SERVER_IP, "/ws/agent")
     defer conn.Close()
 
     go checkin(hostHash)
+    go readFilter(conn)
 
     for _, device := range ifaces {
         log.Printf("Interface Name: %s", device.Name)
@@ -121,7 +128,8 @@ func capturePackets(iface string) {
             srcIP = packetNetworkInfo.NetworkFlow().Src().String()
             dstIP = packetNetworkInfo.NetworkFlow().Dst().String()
 
-            if strings.Contains(srcIP, ":") || strings.Contains(dstIP, ":") || ipIsInBlock(srcIP, ignore) || ipIsInBlock(dstIP, ignore) || srcIP == *SERVER_IP || dstIP == *SERVER_IP {
+            if strings.Contains(srcIP, ":") || strings.Contains(dstIP, ":") || ipIsInBlock(srcIP, ignore) ||
+            ipIsInBlock(dstIP, ignore) || srcIP == *SERVER_IP || dstIP == *SERVER_IP {
                 continue
             }
 
@@ -155,7 +163,7 @@ func capturePackets(iface string) {
                 } else if connMap[connHash] == minConnCount {
                     connData := interface{}(map[string]interface{}{
                         "OpCode": 5,
-                        "ID": fmt.Sprint(connHash),
+                        "ID": connHash,
                         "Src":  srcIP,
                         "Dst":  dstIP,
                         "Port": dpt,
@@ -184,7 +192,7 @@ func capturePackets(iface string) {
                     serverChan <- jsonData
                 }
             } else {
-                    incrementConnCount(connHash)
+                incrementConnCount(connHash)
             }
         }
     }
@@ -202,6 +210,30 @@ func ipIsInBlock(ip string, block []*net.IPNet) bool {
         }
     }
     return false
+}
+
+func appendFilter(cidr string) {
+    _, block, err := net.ParseCIDR(cidr)
+    if err != nil {
+        log.Printf("parse error on %q: %v", cidr, err)
+    }
+    rwLock.Lock()
+    ignore = append(ignore, block)
+    rwLock.Unlock()
+}
+
+func removeFilter(cidr string) {
+    _, block, err := net.ParseCIDR(cidr)
+    if err != nil {
+        log.Printf("parse error on %q: %v", cidr, err)
+    }
+    for i, b := range ignore {
+        if b.String() == block.String() {
+            rwLock.Lock()
+            ignore = append(ignore[:i], ignore[i+1:]...)
+            rwLock.Unlock()
+        }
+    }
 }
 
 func isInterfaceUp(interfaceName string) bool {
@@ -227,7 +259,7 @@ func initializeWebSocket(server, path string) *websocket.Conn {
     return conn
 }
 
-func RegisterAgent(hash string) {
+func RegisterAgent(hash, key string) {
     log.Println("Registering agent...")
 
     hostOS := runtime.GOOS
@@ -236,6 +268,7 @@ func RegisterAgent(hash string) {
         "ID": fmt.Sprint(hash),
         "Hostname": hostname,
         "HostOS": hostOS,
+        "Key": key,
     })
 
     jsonData, err := json.Marshal(host)
@@ -254,6 +287,36 @@ func checkin(hostHash string) {
     for {
         serverChan <- ping
         time.Sleep(2 * time.Second)
+    }
+}
+
+func readFilter(conn *websocket.Conn) {
+    for {
+        _, msg, err := conn.ReadMessage()
+        if err != nil {
+            fmt.Println(err)
+        } else {
+            filter := make(map[string]interface{})
+            err := json.Unmarshal(msg, &filter)
+            if err != nil {
+                fmt.Println(err)
+            }
+
+            opCode := filter["OpCode"].(float64)
+
+            fmt.Println(filter)
+
+            switch opCode {
+            case 1:
+                appendFilter(filter["CIDR"].(string))
+                fmt.Println(ignore)
+            case 2:
+                removeFilter(filter["CIDR"].(string))
+            default:
+                log.Println("Invalid OpCode")
+            }
+
+        }
     }
 }
 

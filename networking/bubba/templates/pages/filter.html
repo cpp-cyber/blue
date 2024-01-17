@@ -14,22 +14,13 @@
             </div>
         </div>
     </div>
-
 </div>
+
 {{ template "Topology" }}
 
 <script>
     $(document).ready(function () {
         createCheckboxes();
-    });
-
-    $(document).ready(function(){
-        $("#search").on("keyup", function() {
-            var value = $(this).val().toLowerCase();
-            $("#checkboxes li").filter(function() {
-                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-            });
-        });
     });
 
     function createCheckboxes() {
@@ -57,9 +48,9 @@
     }
 
     function createCheckbox(ip) {
-        var ul = document.getElementById("checkboxes");
-        var list = document.createElement("li");
-        ul.className = "row form-check form-check-inline";
+        var div = document.getElementById("checkboxes");
+        var childDiv = document.createElement("div");
+        childDiv.className = "row form-check form-check-inline";
         var checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.name = ip;
@@ -71,8 +62,8 @@
         label.appendChild(document.createTextNode(ip));
         label.className = "form-check-label";
 
-        list.appendChild(label)
-        ul.appendChild(list);
+        childDiv.appendChild(label);
+        div.appendChild(childDiv);
     }
 
     function filter() {

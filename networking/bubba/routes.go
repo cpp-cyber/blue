@@ -14,16 +14,21 @@ var upgrader = websocket.Upgrader{
 }
 
 func addPublicRoutes(g *gin.RouterGroup) {
-    g.GET("/", index)
+    g.GET("/", basicAuth)
+    g.GET("/ws/agent", wsAgent)
+    g.POST("/api/agents/add", AddAgent)
+}
+
+func addPrivateRoutes(g *gin.RouterGroup) {
+    g.GET("/topology", index)
     g.GET("/connections", connections)
     g.GET("/filter", filter)
     g.GET("/agents", agents)
 
-	g.GET("/api/connections/get", GetConnections)
+    g.GET("/api/connections/get", GetConnections)
     g.GET("/api/agents/get", GetAgents)
-    g.POST("/api/agents/add", AddAgent)
-    g.GET("/ws/agent", wsAgent)
     g.GET("/ws/web", wsWeb)
+
 }
 
 func index(c *gin.Context) {

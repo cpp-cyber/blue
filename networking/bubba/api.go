@@ -6,6 +6,7 @@ import (
 	"networkinator/models"
 	"strconv"
 	"strings"
+    "fmt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -88,7 +89,17 @@ func AddAgent(c *gin.Context) {
     hostname := jsonData["Hostname"].(string)
     hostOS := jsonData["HostOS"].(string)
     id := jsonData["ID"].(string)
+    key := jsonData["Key"].(string)
     ip := strings.Split(c.ClientIP(), ":")[0]
+
+    fmt.Println(key)
+    fmt.Println(tomlConf.AgentKey)
+    fmt.Println(key == tomlConf.AgentKey)
+
+    if strings.Compare(key, tomlConf.AgentKey) != 0 {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid key"})
+        return
+    }
 
     agent := models.Agent{}
     tx := db.First(&agent, "Hostname = ?", hostname)
@@ -113,6 +124,17 @@ func AgentStatus(jsonData []byte) {
             log.Println(err)
             client.Close()
             delete(webClients, client)
+        }
+    }
+}
+
+func sendToAgents(jsonData []byte) {
+    for client := range agentClients {
+        err := client.WriteMessage(websocket.TextMessage, jsonData)
+        if err != nil {
+            log.Println(err)
+            client.Close()
+            delete(agentClients, client)
         }
     }
 }
