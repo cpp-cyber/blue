@@ -167,6 +167,7 @@ cat << EOF > /etc/rsyslog.d/69-remote.conf
 \$InputRunFileMonitor
 
 *.* @$IP:514
+&stop
 EOF
 if [ ! $ALP ]; then
     if command -v systemctl >/dev/null; then
