@@ -105,10 +105,17 @@ echo -e "${BLUE}[+] World Writeable Files${NC}"
 echo -e "${YELLOW}$WORLDWRITEABLES${NC}\n"
 echo -e "${GREEN}#############Listening Ports############${NC}"
 echo ""
-( DPRINT netstat -tlpn | tail -n +3 | awk '{print $1 " " $4 " " $6 " " $7}'| DPRINT column -t || DPRINT ss -blunt -p | tail -n +2 | awk '{print $1 " " $5 " " $7}' | DPRINT column -t )
+if command -v netstat > /dev/null; then
+    NETCMD="netstat"
+    PORTS=$( DPRINT netstat -tulpn | tail -n +3 | awk '{print $1 " " $4 " " $6 " " $7}' )
+elif command -v ss > /dev/null; then
+    NETCMD="ss"
+    PORTS=$( DPRINT ss -blunt -p | tail -n +2 | awk '{print $1 " " $5 " " $7}' )
+fi
+echo "$PORTS"
 echo ""
 echo -e "${GREEN}#############SERVICE INFORMATION############${NC}"
-if [  $IS_ALPINE = true ]; then
+if [ $IS_ALPINE = true ]; then
     SERVICES=$( rc-status -s | grep started | awk '{print $1}' )
 elif [ $IS_SLACK = true ]; then
     SERVICES=$( ls -la /etc/rc.d | grep rwx | awk '{print $9}' ) 
@@ -126,14 +133,14 @@ checkService()
     if [ -n "$serviceAlias" ]; then
         echo -e "\n${BLUE}[+] $serviceToCheckExists is on this machine${NC}\n"
         if echo "$serviceList" | grep -qi "$serviceAlias" ; then
-            if [ "$( DPRINT netstat -tulpn | grep -i \"$serviceAlias\" )" ] || [ "$( DPRINT ss -blunt -p | grep -i "$serviceAlias" )" ]; then
-                echo -e "Active on port(s) ${YELLOW}$(netstat -tulpn | grep -i $serviceAlias | awk 'BEGIN {ORS=" and "} {print $1, $4}' | sed 's/\(.*\)and /\1\n/')${NC}\n"
+            if [ "$( echo "$PORTS" | grep -i \"$serviceAlias\" )" ] ; then
+                echo -e "Active on port(s) ${YELLOW}$( echo "$PORTS" | grep -i $serviceAlias | awk 'BEGIN {ORS=" and "} {print $1, $4}' | sed 's/\(.*\)and /\1\n/' || echo "$PORTS" | grep -i $serviceAlias | awk 'BEGIN {ORS=" and "} {print $1, $4}' | awk '{print $2}' )${NC}\n"
             fi
         fi
     elif echo "$serviceList" | grep -qi "$serviceToCheckExists" ; then
         echo -e "\n${BLUE}[+] $serviceToCheckExists is on this machine${NC}\n"
-        if [ "$( DPRINT netstat -tulpn | grep -i \"$serviceToCheckExists\" )" ] || [ "$( DPRINT ss -blunt -p | grep -i "$serviceToCheckExists" )" ]; then
-            echo -e "Active on port(s) ${YELLOW}$( DPRINT netstat -tulpn | grep -i $serviceToCheckExists | awk 'BEGIN {ORS=" and "} {print $1, $4}' | sed 's/\(.*\)and /\1\n/')${NC}\n"
+        if[ "$( echo \"$PORTS\" | grep -i \"$serviceToCheckExists\" )" ]; then
+            echo -e "Active on port(s) ${YELLOW}$( echo "$PORTS" | grep -i $serviceToCheckExists | awk 'BEGIN {ORS=" and "} {print $1, $4}' | sed 's/\(.*\)and /\1\n/' || echo "$PORTS" | grep -i $serviceToCheckExists | awk 'BEGIN {ORS=" and "} {print $1, $4}' | awk '{print $2}' )${NC}\n"
         fi
     fi
 }
