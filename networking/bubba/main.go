@@ -3,6 +3,7 @@ package main
 import (
 	"networkinator/models"
 	"log"
+    "os"
 
 	"github.com/gin-gonic/gin"
     "github.com/gorilla/websocket"
@@ -21,6 +22,15 @@ var (
 func main() {
     models.ReadConfig(tomlConf, configPath)
 
+    f, err := os.OpenFile("server.txt", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+    if err != nil {
+        log.Fatalf("error opening file: %v", err)
+    }
+    defer f.Close()
+
+    log.SetOutput(f)
+
+    gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	router.LoadHTMLGlob("templates/**/*")
 	router.MaxMultipartMemory = 8 << 20 // 8 MiB
@@ -35,7 +45,7 @@ func main() {
     private.Use(authRequired)
 	addPrivateRoutes(private)
 
-    err := db.AutoMigrate(&models.Connection{}, &models.Agent{})
+    err = db.AutoMigrate(&models.Connection{}, &models.Agent{})
 	if err != nil {
 		log.Fatalln(err)
 	}

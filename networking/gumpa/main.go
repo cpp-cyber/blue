@@ -143,7 +143,7 @@ func capturePackets(iface string) {
                 continue
             }
 
-            if whitelistMode && !(ipIsInBlock(srcIP, whitelist) || ipIsInBlock(dstIP, whitelist)) {
+            if whitelistMode && !(ipIsInBlock(srcIP, whitelist) && ipIsInBlock(dstIP, whitelist)) {
                 continue
             }
 
