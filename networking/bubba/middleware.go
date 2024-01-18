@@ -59,7 +59,6 @@ func handleWebSocket(conn *websocket.Conn) {
         case 3:
             id := jsonData["ID"].(string)
             DeleteConnectionFromDB(id)
-            continue
         }
 
         sendToAgents(msg)

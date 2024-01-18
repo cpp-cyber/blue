@@ -25,7 +25,10 @@ import (
 )
 
 var (
-    ignore []*net.IPNet
+    blacklist []*net.IPNet
+    blacklistMode = true
+    whitelist []*net.IPNet
+    whitelistMode = false
 
     SERVER_IP *string
     hostname, _ = os.Hostname()
@@ -70,7 +73,7 @@ func main() {
         log.Println(err)
     }
 
-    appendFilter("224.0.0.0/3")
+    blacklist = appendFilter("224.0.0.0/3", blacklist)
 
     hostHash := fmt.Sprint(hash(hostname))
     RegisterAgent(hostHash, key)
@@ -128,11 +131,24 @@ func capturePackets(iface string) {
             srcIP = packetNetworkInfo.NetworkFlow().Src().String()
             dstIP = packetNetworkInfo.NetworkFlow().Dst().String()
 
-            if strings.Contains(srcIP, ":") || strings.Contains(dstIP, ":") || ipIsInBlock(srcIP, ignore) ||
-            ipIsInBlock(dstIP, ignore) || srcIP == *SERVER_IP || dstIP == *SERVER_IP {
+            if strings.Contains(srcIP, ":") || strings.Contains(dstIP, ":") {
                 continue
             }
 
+            if srcIP == *SERVER_IP || dstIP == *SERVER_IP {
+                continue
+            }
+
+            if blacklistMode && (ipIsInBlock(srcIP, blacklist) || ipIsInBlock(dstIP, blacklist)) {
+                continue
+            }
+
+            if whitelistMode && !(ipIsInBlock(srcIP, whitelist) || ipIsInBlock(dstIP, whitelist)) {
+                continue
+            }
+
+        } else {
+            continue
         }
 
         packetTransportInfo := packet.TransportLayer()
@@ -156,43 +172,38 @@ func capturePackets(iface string) {
             }
 
             connHash := fmt.Sprint(hash(srcIP+dstIP+dpt))
-            if _, ok := connMap[connHash]; ok {
-                if connMap[connHash] < minConnCount {
-                    incrementConnCount(connHash)
-                    continue
-                } else if connMap[connHash] == minConnCount {
-                    connData := interface{}(map[string]interface{}{
-                        "OpCode": 5,
-                        "ID": connHash,
-                        "Src":  srcIP,
-                        "Dst":  dstIP,
-                        "Port": dpt,
-                        "Count": connMap[connHash],
-                    })
-                    jsonData, err := json.Marshal(connData)
-                    if err != nil {
-                        log.Println(err)
-                    }
-                    incrementConnCount(connHash)
-                    serverChan <- jsonData
-                } else {
-                    connData := interface{}(map[string]interface{}{
-                        "OpCode": 6,
-                        "ID": connHash,
-                        "Src":  "",
-                        "Dst":  "",
-                        "Port": "",
-                        "Count": connMap[connHash],
-                    })
-                    jsonData, err := json.Marshal(connData)
-                    if err != nil {
-                        log.Println(err)
-                    }
-                    incrementConnCount(connHash)
-                    serverChan <- jsonData
+            incrementConnCount(connHash)
+            count := readConnCount(connHash)
+            if count < minConnCount {
+                continue
+            } else if count == minConnCount {
+                connData := interface{}(map[string]interface{}{
+                    "OpCode": 5,
+                    "ID": connHash,
+                    "Src":  srcIP,
+                    "Dst":  dstIP,
+                    "Port": dpt,
+                    "Count": connMap[connHash],
+                })
+                jsonData, err := json.Marshal(connData)
+                if err != nil {
+                    log.Println(err)
                 }
+                serverChan <- jsonData
             } else {
-                incrementConnCount(connHash)
+                connData := interface{}(map[string]interface{}{
+                    "OpCode": 6,
+                    "ID": connHash,
+                    "Src":  "",
+                    "Dst":  "",
+                    "Port": "",
+                    "Count": count,
+                })
+                jsonData, err := json.Marshal(connData)
+                if err != nil {
+                    log.Println(err)
+                }
+                serverChan <- jsonData
             }
         }
     }
@@ -212,28 +223,33 @@ func ipIsInBlock(ip string, block []*net.IPNet) bool {
     return false
 }
 
-func appendFilter(cidr string) {
+func appendFilter(cidr string, list []*net.IPNet) []*net.IPNet {
     _, block, err := net.ParseCIDR(cidr)
     if err != nil {
         log.Printf("parse error on %q: %v", cidr, err)
+        return list
     }
     rwLock.Lock()
-    ignore = append(ignore, block)
+    list = append(list, block)
     rwLock.Unlock()
+
+    return list
 }
 
-func removeFilter(cidr string) {
+func removeFilter(cidr string, list []*net.IPNet) []*net.IPNet {
     _, block, err := net.ParseCIDR(cidr)
     if err != nil {
         log.Printf("parse error on %q: %v", cidr, err)
+        return list
     }
-    for i, b := range ignore {
+    for i, b := range list {
         if b.String() == block.String() {
             rwLock.Lock()
-            ignore = append(ignore[:i], ignore[i+1:]...)
+            list = append(list[:i], list[i+1:]...)
             rwLock.Unlock()
         }
     }
+    return list
 }
 
 func isInterfaceUp(interfaceName string) bool {
@@ -304,14 +320,34 @@ func readFilter(conn *websocket.Conn) {
 
             opCode := filter["OpCode"].(float64)
 
-            fmt.Println(filter)
-
             switch opCode {
             case 1:
-                appendFilter(filter["CIDR"].(string))
-                fmt.Println(ignore)
+                cidr := filter["CIDR"].(string)
+                blacklist = appendFilter(cidr, blacklist)
             case 2:
-                removeFilter(filter["CIDR"].(string))
+                cidr := filter["CIDR"].(string)
+                blacklist = removeFilter(cidr, blacklist)
+            case 3:
+                connHash := filter["ID"].(string)
+                rwLock.Lock()
+                connMap[connHash] = 0
+                rwLock.Unlock()
+            case 10:
+                cidr := filter["CIDR"].(string)
+                whitelist = appendFilter(cidr, whitelist)
+            case 11:
+                cidr := filter["CIDR"].(string)
+                whitelist = removeFilter(cidr, whitelist)
+            case 13:
+                whitelistMode = false
+                blacklistMode = true
+            case 14:
+                whitelistMode = true
+                blacklistMode = false
+            case 15:
+                whitelist = []*net.IPNet{}
+            case 16:
+                blacklist = []*net.IPNet{}
             default:
                 log.Println("Invalid OpCode")
             }

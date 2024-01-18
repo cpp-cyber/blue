@@ -23,6 +23,16 @@
         createCheckboxes();
     });
 
+
+    $(document).ready(function(){
+        $("#search").on("keyup", function() {
+            var value = $(this).val().toLowerCase();
+            $("#checkboxes li").filter(function() {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+            });
+        });
+    });
+
     function createCheckboxes() {
         var xhttp = new XMLHttpRequest();
         var div = document.getElementById("checkboxes");
@@ -47,23 +57,21 @@
         xhttp.send();
     }
 
-    function createCheckbox(ip) {
-        var div = document.getElementById("checkboxes");
-        var childDiv = document.createElement("div");
-        childDiv.className = "row form-check form-check-inline";
+ function createCheckbox(ip) {
+        var ul = document.getElementById("checkboxes");
+        var list = document.createElement("li");
+        ul.className = "row form-check form-check-inline";
         var checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.name = ip;
-        checkbox.value = ip;
-        checkbox.className = "form-check-input form-check-inline";
 
-        var label = document.createElement('label')
+        label = document.createElement('label')
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(ip));
-        label.className = "form-check-label";
+        label.ClassName = "form-check-label";
 
-        childDiv.appendChild(label);
-        div.appendChild(childDiv);
+        list.appendChild(label);
+        ul.appendChild(list);
     }
 
     function filter() {

@@ -1,5 +1,20 @@
 {{ template "Header" }}
 <div class="container-fluid">
+    <div class="row d-flex justify-content-around mb-4">
+        <div class="col-md-6 ">
+            <input type="text" class="form-control mb-2" id="cidr" placeholder="Filter">
+            <div class="d-flex align-items-center justify-content-center">
+            <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="ModifyList(10)">Add to Whitelist</button>
+            <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="ModifyList(11)">Remove from Whitelist</button>
+            <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="ModifyList(1)">Add to Blacklist</button>
+            <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="ModifyList(2)">Remove from Blacklist</button>
+            <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="SendCmd(13)">Enable Blacklist Mode</button>
+            <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="SendCmd(14)">Enable Whitelist Mode</button>
+            <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="SendCmd(15)">Clear Whitelist</button>
+            <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="SendCmd(16)">Clear Blacklist</button>
+            </div>
+        </div>
+    </div>
     <div class="row">
         <div id="agents" class="h-100 d-flex align-items-center justify-content-center row">
         </div>
@@ -36,7 +51,6 @@
             '<div class="card-body">' +
             '<h5 class="card-title">' + hostname + '</h5>' +
             '<p class="card-text">' + ip + '</p>' +
-            '<button type="button" class="btn btn-primary">Add Filter</button>' +
             '</div>' +
             '</div>' +
             '</div>';
@@ -51,6 +65,24 @@
     function AgentUp(id) {
         document.getElementById(id).classList.remove("text-bg-danger");
         document.getElementById(id).classList.add("text-bg-success");
+    }
+
+    function ModifyList(opcode) {
+        var cidr = document.getElementById("cidr").value;
+        if (cidr === "") {
+            alert("Please enter a CIDR");
+            return;
+        }
+        socket.send(JSON.stringify({
+            "OpCode": opcode,
+            "CIDR": cidr
+        }));
+    }
+
+    function SendCmd(opcode) {
+        socket.send(JSON.stringify({
+            "OpCode": opcode,
+        }));
     }
 
 </script>
