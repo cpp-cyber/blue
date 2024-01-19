@@ -66,7 +66,7 @@ if (!$Purge -and $Hosts -ne '' -and $Cred -ne $null) {
             if (Test-Port -Ip $Computer -Timeout $Timeout -Verbose) {
                 Write-Host "[INFO] $Computer SMB is online... Copying" -ForegroundColor Green
                 New-PSDrive -Name $DriveLetters[$i] -PSProvider FileSystem -Root \\$Computer\C$ -Persist -Credential $Cred
-                Robocopy.exe .\bins \\$Computer\C$\Windows\System32\ /COMPRESS /MT:16 /R:1 /W:1 /UNILOG+:robo.log /TEE /s
+                Robocopy.exe .\bins \\$Computer\C$\Windows\System32\ /COMPRESS /MT:16 /R:1 /W:1 /UNILOG+:robo.log /TEE /s /xx
             }
             else {
                 Write-Host "[ERROR] Failed to move bins to $Computer" -ForegroundColor Red
