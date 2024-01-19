@@ -31,6 +31,7 @@ $COnfigString_FileUploads = "file_uploads=off"
 Foreach ($ConfigFile in $ConfigFiles) {
     Add-Content $ConfigFile $ConfigString_DisableFuncs
     Add-Content $ConfigFile $ConfigString_FileUploads
+    Write-Output "$Env:ComputerName [INFO] PHP functions disabled in $ConfigFile"
 }
-Write-Output "$Env:ComputerName [INFO] PHP functions disabled"
+
 $Error | Out-File $env:USERPROFILE\Desktop\php.txt -Append -Encoding utf8
