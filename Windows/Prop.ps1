@@ -70,6 +70,7 @@ if (!$Purge -and $Hosts -ne '' -and $Cred -ne $null) {
             }
             else {
                 Write-Host "[ERROR] Failed to move bins to $Computer" -ForegroundColor Red
+                Write-Output "$Computer [ERROR] Failed to move bins" | Out-File .\robo_fail.log -Append
             }
             $i--
         }
