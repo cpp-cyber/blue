@@ -21,7 +21,7 @@ Get-WmiObject Win32_NetworkAdapterConfiguration | ? {$_.IpAddress -ne $null} | %
 Copy-Item C:\Windows\System32\GroupPolicy* C:\gp -Recurse | Out-Null
 Remove-Item C:\Windows\System32\GroupPolicy* -Recurse -Force | Out-Null
 gpupdate /force
-Write-Output "$Env:ComputerName [INFO] Group Policy reset" 
+Write-Output "$Env:ComputerName [INFO] Group Policy backed up to C:\gp and reset" 
 
 reg add "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts" /v "Segoe UI (TrueType)" /t REG_SZ /d "segoeui.ttf" /f | Out-Null
 reg add "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts" /v "Segoe UI Black (TrueType)" /t REG_SZ /d "seguibl.ttf" /f | Out-Null
