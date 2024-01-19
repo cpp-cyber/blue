@@ -41,10 +41,12 @@ catch {
 ######### Sysmon Setup #########
 if ($Env:PROCESSOR_ARCHITECTURE -eq "AMD64") {
     C:\Windows\System32\Sysmon64.exe -accepteula -i C:\Windows\System32\smce.xml
+    Write-Output "$Env:ComputerName [INFO] Sysmon64 installed and configured"
 }
 else {
     C:\Windows\System32\Sysmon.exe -accepteula -i C:\Windows\System32\smce.xml
+    Write-Output "$Env:ComputerName [INFO] Sysmon32 installed and configured"
 }
-Write-Output "$Env:ComputerName [INFO] Sysmon installed and configured"
+
 
 $Error | Out-File $env:USERPROFILE\Desktop\log.txt -Append -Encoding utf8
