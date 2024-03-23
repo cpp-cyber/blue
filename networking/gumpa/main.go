@@ -36,7 +36,7 @@ var (
     serverChan = make(chan []byte)
 
     connMap = make(map[string]int)
-    minConnCount = 5
+    minConnCount = 3
 
     rwLock sync.RWMutex
     mu sync.Mutex
@@ -332,6 +332,8 @@ func readFilter(conn *websocket.Conn) {
                 rwLock.Lock()
                 connMap[connHash] = 0
                 rwLock.Unlock()
+            case 5:
+                minConnCount = int(filter["Count"].(float64))
             case 10:
                 cidr := filter["CIDR"].(string)
                 whitelist = appendFilter(cidr, whitelist)
