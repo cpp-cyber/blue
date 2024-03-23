@@ -61,6 +61,7 @@ func handleWebSocket(conn *websocket.Conn) {
             DeleteConnectionFromDB(id)
         }
 
+        agentChan <- jsonData
         sendToAgents(msg)
 
     }
@@ -98,16 +99,46 @@ func handleAgentSocket(conn *websocket.Conn) {
 
         switch jsonData["OpCode"].(float64) {
         case 0:
-            jsonData := []byte(fmt.Sprintf(`{"ID": "%s", "Status": "Alive"}`, strconv.FormatFloat(jsonData["ID"].(float64), 'f', -1, 64)))
-            AgentStatus(jsonData)
+            statusChan <- jsonData
         case 5:
-            AddConnection(jsonData)
+            connChan <- jsonData
         case 6:
-            id := jsonData["ID"].(string)
-            count := jsonData["Count"].(float64)
-            UpdateConnectionCount(id, count)
+            connChan <- jsonData
         default:
             log.Println("Unknown OpCode")
         }
     }
 }
+
+func handleMsg() {
+    for {
+        select {
+        case msg := <-statusChan:
+            jsonData := []byte(fmt.Sprintf(`{"ID": "%s", "Status": "Alive"}`, strconv.FormatFloat(msg["ID"].(float64), 'f', -1, 64)))
+            for client := range webClients {
+                client.WriteMessage(websocket.TextMessage, jsonData)
+            }
+        case msg := <-agentChan:
+            jsonData, err := json.Marshal(msg)
+            if err != nil {
+                log.Println(err)
+                return
+            }
+            ip := msg["IP"].(string)
+            for client := range agentClients {
+                clientIP := strings.Split(client.NetConn().RemoteAddr().String(), ":")[0]
+                if ip == clientIP {
+                    client.WriteMessage(websocket.TextMessage, jsonData)
+                }
+            }
+        case msg := <-connChan:
+            if msg["OpCode"].(float64) == 5 {
+                AddConnection(msg)
+            } else if msg["OpCode"].(float64) == 6 {
+                id := msg["ID"].(string)
+                count := msg["Count"].(float64)
+                UpdateConnectionCount(id, count)
+            }
+        }
+    }
+}   

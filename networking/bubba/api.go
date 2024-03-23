@@ -6,10 +6,13 @@ import (
 	"networkinator/models"
 	"strconv"
 	"strings"
+    "sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
+
+var rwLock = sync.RWMutex{}
 
 func GetConnections(c *gin.Context) {
     connections, err := GetAllConnections(db)
