@@ -24,6 +24,19 @@ func AddConnectionToDB(id string, src, dst string, port int, count float64) erro
 	return nil
 }
 
+func DeleteConnectionFromDB(id string) error {
+    var connection models.Connection
+    result := db.Where("id = ?", id).First(&connection)
+    if result.Error != nil {
+        return result.Error
+    }
+    result = db.Delete(&connection)
+    if result.Error != nil {
+        return result.Error
+    }
+    return nil
+}
+
 func GetAllConnections(db *gorm.DB) ([]models.Connection, error) {
 	var connections []models.Connection
 	result := db.Find(&connections)

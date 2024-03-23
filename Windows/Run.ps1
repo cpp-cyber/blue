@@ -192,7 +192,6 @@ if (($Script -ne '') -and ($global:Sessions.Count -gt 0) -and ($Out -ne '')) {
             Start-Sleep -Milliseconds 25
         }
     }
-    Write-Host $timer.elapsed
     Get-Job | Remove-Job
 }
 if ($Sessions.Count -eq 0 -and !$Connect) {

@@ -93,10 +93,10 @@ $CFG['Search'][] = array ( "DisplayName" => "All messages from last 31 days", "S
 // ---
 
 // --- Predefined Charts!
-$CFG['Charts']['Chart1'] = array ( "DisplayName" => "Top Hosts", "chart_type" => CHART_BARS_HORIZONTAL, "chart_width" => 400, "chart_field" => SYSLOG_HOST, "maxrecords" => 10, "showpercent" => 0, "chart_enabled" => 1 );
-$CFG['Charts']['Chart2'] = array ( "DisplayName" => "SyslogTags", "chart_type" => CHART_CAKE, "chart_width" => 400, "chart_field" => SYSLOG_SYSLOGTAG, "maxrecords" => 10, "showpercent" => 0, "chart_enabled" => 1 );
-$CFG['Charts']['Chart3'] = array ( "DisplayName" => "Severity Occurences", "chart_type" => CHART_BARS_VERTICAL, "chart_width" => 400, "chart_field" => SYSLOG_SEVERITY, "maxrecords" => 10, "showpercent" => 1, "chart_enabled" => 1 );
-$CFG['Charts']['Chart4'] = array ( "DisplayName" => "Usage by Day", "chart_type" => CHART_CAKE, "chart_width" => 400, "chart_field" => SYSLOG_DATE, "maxrecords" => 10, "showpercent" => 1, "chart_enabled" => 1 );
+$CFG['Charts']['Chart1'] = array ( "DisplayName" => "Top Hosts", "chart_type" => CHART_BARS_HORIZONTAL, "chart_width" => 400, "chart_field" => SYSLOG_HOST, "maxrecords" => 20, "showpercent" => 0, "chart_enabled" => 1 );
+$CFG['Charts']['Chart2'] = array ( "DisplayName" => "SyslogTags", "chart_type" => CHART_CAKE, "chart_width" => 400, "chart_field" => SYSLOG_SYSLOGTAG, "maxrecords" => 20, "showpercent" => 0, "chart_enabled" => 1 );
+$CFG['Charts']['Chart3'] = array ( "DisplayName" => "Severity Occurences", "chart_type" => CHART_BARS_VERTICAL, "chart_width" => 400, "chart_field" => SYSLOG_SEVERITY, "maxrecords" => 20, "showpercent" => 1, "chart_enabled" => 1 );
+$CFG['Charts']['Chart4'] = array ( "DisplayName" => "Usage by Day", "chart_type" => CHART_CAKE, "chart_width" => 400, "chart_field" => SYSLOG_DATE, "maxrecords" => 20, "showpercent" => 1, "chart_enabled" => 1 );
 // ---
 
 // --- Configure allowed directories for File base logstream sources

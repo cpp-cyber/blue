@@ -83,7 +83,20 @@ if [ ! -d '/etc/rsyslog.d' ]; then
     mkdir /etc/rsyslog.d
 fi
 
-cat << EOF > /etc/rsyslog.d/69-remote.conf
+if [ $ALP ]; then 
+    cat << EOF >> /etc/rsyslog.d/69-remote.conf
+    # Alpine Auth
+    \$InputFileName /var/log/messages
+    \$InputFileStateFile auth_log
+    \$InputFileTag auth_log
+    \$InputFileSeverity info
+    \$InputFileFacility local1
+    \$InputRunFileMonitor
+    EOF
+fi
+
+
+cat << EOF >> /etc/rsyslog.d/69-remote.conf
 
 # Ubuntu Auth 
 \$ModLoad imfile 
@@ -96,14 +109,6 @@ cat << EOF > /etc/rsyslog.d/69-remote.conf
 
 # CentOS Auth
 \$InputFileName /var/log/secure
-\$InputFileStateFile auth_log
-\$InputFileTag auth_log
-\$InputFileSeverity info
-\$InputFileFacility local1
-\$InputRunFileMonitor
-
-# Alpine Auth
-\$InputFileName /var/log/messages
 \$InputFileStateFile auth_log
 \$InputFileTag auth_log
 \$InputFileSeverity info
@@ -166,7 +171,8 @@ cat << EOF > /etc/rsyslog.d/69-remote.conf
 \$InputFileFacility local5
 \$InputRunFileMonitor
 
-*.* @$IP:514
+*.* @$IP:514    
+&stop
 EOF
 if [ ! $ALP ]; then
     if command -v systemctl >/dev/null; then

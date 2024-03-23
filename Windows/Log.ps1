@@ -23,7 +23,7 @@ reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit" /
 # Powershell command transcription
 reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription" /v EnableTranscripting /t REG_DWORD /d 1 /f | Out-Null
 reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription" /v EnableInvocationHeader /t REG_DWORD /d 1 /f | Out-Null
-reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription" /v OutputDirectory /t REG_SZ /d "C:\Windows\debug\timber" /f | Out-Null
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription" /v OutputDirectory /t REG_SZ /d "$env:USERPROFILE\Desktop\PSLogs" /f | Out-Null
 # Powershell script block logging
 reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging" /v EnableScriptBlockLogging /t REG_DWORD /d 1 /f | Out-Null
 reg add "HKLM\Software\Policies\Microsoft\Windows\PowerShell\ModuleLogging" /v EnableModuleLogging /t REG_DWORD /d 1 /f | Out-Null
@@ -40,11 +40,13 @@ catch {
 
 ######### Sysmon Setup #########
 if ($Env:PROCESSOR_ARCHITECTURE -eq "AMD64") {
-    C:\Windows\System32\bins\Sysmon64.exe -accepteula -i C:\Windows\System32\bins\smce.xml
+    C:\Windows\System32\Sysmon64.exe -accepteula -i C:\Windows\System32\smce.xml
+    Write-Output "$Env:ComputerName [INFO] Sysmon64 installed and configured"
 }
 else {
-    C:\Windows\System32\bins\Sysmon.exe -accepteula -i C:\Windows\System32\bins\smce.xml
+    C:\Windows\System32\Sysmon.exe -accepteula -i C:\Windows\System32\smce.xml
+    Write-Output "$Env:ComputerName [INFO] Sysmon32 installed and configured"
 }
-Write-Output "$Env:ComputerName [INFO] Sysmon installed and configured"
+
 
 $Error | Out-File $env:USERPROFILE\Desktop\log.txt -Append -Encoding utf8

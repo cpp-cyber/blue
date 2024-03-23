@@ -1,4 +1,3 @@
-
 url = 'ws://localhost/ws/web';
 var socket = new WebSocket(url);
 
