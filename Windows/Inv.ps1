@@ -43,6 +43,10 @@ $dnsAddresses = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkI
 $dnsAddresses | Select-Object -ExpandProperty IPAddressToString
 Write-Output "#### End DNS Servers ####" 
 
+#SMB Shares
+Write-Output "#### Start SMB Shares ####" 
+Get-WmiObject -Class Win32_Share | Select-Object Name,Path
+Write-Output "#### End SMB Shares ####" 
 
 if ($IIS) {
     Write-Output "`n#### Start IIS Site Bindings ####"
@@ -63,6 +67,54 @@ if ($IIS) {
     }
     Write-Output "#### End IIS Site Bindings ####"
 }
+
+#Installed Programs
+
+Write-Output "`n#### Start Installed Programs ####" 
+$programs = foreach ($UKey in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\SOFTWARE\Wow6432node\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\SOFTWARE\Wow6432node\Microsoft\Windows\CurrentVersion\Uninstall\*') {
+    foreach ($Product in (Get-ItemProperty $UKey -ErrorAction SilentlyContinue)) {
+        if($Product.DisplayName -and $Product.SystemComponent -ne 1) {
+            $Product.DisplayName + " - " + $Product.DisplayVersion
+        }
+    }
+}
+$programs = $programs | sort.exe
+Write-Output $programs
+Write-Output "#### End Installed Programs ####" 
+
+#Users and Groups
+Write-Output "`n#### Start Group Membership ####" 
+if ($DC) {
+    $Groups = Get-ADGroup -Filter 'SamAccountName -NotLike "Domain Users"' | Select-Object -ExpandProperty Name
+    $Groups | ForEach-Object {
+        $Users = Get-ADGroupMember -Identity $_ | Select-Object -ExpandProperty Name
+        if ($Users.Count -gt 0) {
+            $Users = $Users | % { "   Member: $_"}
+            Write-Output "Group: $_" $Users
+        }
+    }
+} else {
+    # Get a list of all local groups
+    $localGroups = [ADSI]"WinNT://localhost"
+
+    # Iterate through each group
+    $localGroups.psbase.Children | Where-Object { $_.SchemaClassName -eq 'group' } | ForEach-Object {
+
+        $groupName = $_.Name[0]
+        Write-Output "Group: $groupName"
+        
+        # List members of the current group
+        $_.Members() | ForEach-Object {
+            $memberPath = ([ADSI]$_).Path.Substring(8)
+            Write-Output "    Member: $memberPath"
+        }
+    }
+}
+Write-Output "#### End Group Membership ####" 
+
+Write-Output "`n#### Start ALL Users ####" 
+Get-WmiObject win32_useraccount | ForEach-Object {$_.Name}
+Write-Output "`n#### End ALL Users ####" 
 
 #RunKeys
 Write-Output "`n#### Start Registry Startups ####" 
@@ -122,60 +174,7 @@ $filteredTasks | ForEach-Object {
 }
 Write-Output "#### End Scheduled Tasks ####" 
 
-#SMB Shares
-Write-Output "#### Start SMB Shares ####" 
-Get-WmiObject -Class Win32_Share | Select-Object Name,Path
-Write-Output "#### End SMB Shares ####" 
-
-#Installed Programs
-
-Write-Output "`n#### Start Installed Programs ####" 
-$programs = foreach ($UKey in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\SOFTWARE\Wow6432node\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\SOFTWARE\Wow6432node\Microsoft\Windows\CurrentVersion\Uninstall\*') {
-    foreach ($Product in (Get-ItemProperty $UKey -ErrorAction SilentlyContinue)) {
-        if($Product.DisplayName -and $Product.SystemComponent -ne 1) {
-            $Product.DisplayName
-        }
-    }
-}
-$programs = $programs | sort.exe
-Write-Output $programs
-Write-Output "#### End Installed Programs ####" 
-
-#Users and Groups
-Write-Output "`n#### Start Group Membership ####" 
-if ($DC) {
-    $Groups = Get-ADGroup -Filter 'SamAccountName -NotLike "Domain Users"' | Select-Object -ExpandProperty Name
-    $Groups | ForEach-Object {
-        $Users = Get-ADGroupMember -Identity $_ | Select-Object -ExpandProperty Name
-        if ($Users.Count -gt 0) {
-            $Users = $Users | % { "   Member: $_"}
-            Write-Output "Group: $_" $Users
-        }
-    }
-} else {
-    # Get a list of all local groups
-    $localGroups = [ADSI]"WinNT://localhost"
-
-    # Iterate through each group
-    $localGroups.psbase.Children | Where-Object { $_.SchemaClassName -eq 'group' } | ForEach-Object {
-
-        $groupName = $_.Name[0]
-        Write-Output "Group: $groupName"
-        
-        # List members of the current group
-        $_.Members() | ForEach-Object {
-            $memberPath = ([ADSI]$_).Path.Substring(8)
-            Write-Output "    Member: $memberPath"
-        }
-    }
-}
-Write-Output "#### End Group Membership ####" 
-
-Write-Output "`n#### Start ALL Users ####" 
-    Get-WmiObject win32_useraccount | ForEach-Object {$_.Name}
-Write-Output "`n#### End ALL Users ####" 
-
 #Windows Features
 Write-Output "`n#### Start Features ####" 
 dism /online /get-features /Format:Table | Select-String Enabled | %{ $_.ToString().Split(" ")[0].Trim()} | sort.exe
-Write-Output "#### End Features ####" 
+Write-Output "#### End Features ####"

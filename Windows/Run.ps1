@@ -24,7 +24,10 @@ param(
     [switch]$NonDomain,
 
     [Parameter(Mandatory=$false)]
-    [String]$Hosts = ''
+    [String]$Hosts = '',
+
+    [Parameter(Mandatory=$false)]
+    [Int]$Timeout = 3000
 )
 
 $ErrorActionPreference = "Continue"
@@ -34,6 +37,42 @@ function Get-Password {
         $p = [System.Web.Security.Membership]::GeneratePassword(14,4)
     } while ($p -match '[,;:|iIlLoO0]')
     return $p + "1!"
+}
+
+function Test-Port {
+    Param(
+        [string]$Ip,
+        [int]$Port,
+        [int]$Timeout = 3000,
+        [switch]$Verbose
+    )
+
+    $ErrorActionPreference = "SilentlyContinue"
+
+    $tcpclient = New-Object System.Net.Sockets.TcpClient
+    $iar = $tcpclient.BeginConnect($ip,$port,$null,$null)
+    $wait = $iar.AsyncWaitHandle.WaitOne($timeout,$false)
+    if (!$wait)
+    {
+        # Close the connection and report timeout
+        $tcpclient.Close()
+        if($verbose){Write-Host "[WARN] $($IP):$Port Connection Timeout " -ForegroundColor Yellow}
+        return $false
+    } 
+    else {
+        # Close the connection and report the error if there is one
+        $error.Clear()
+        $tcpclient.EndConnect($iar) | out-Null
+        if(!$?){if($verbose){write-host $error[0] -ForegroundColor Red};$failed = $true}
+        $tcpclient.Close()
+    }
+
+    if ($failed) {
+        return $false
+    }
+    else {
+        return $true
+    }
 }
 
 if ($Connect) {
@@ -72,15 +111,33 @@ if ($Connect) {
             }
     
             foreach ($Computer in $Computers) {
-                $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred
-                if ($TestSession) {
-                    $global:Sessions += $TestSession
-                    Write-Host "[INFO] Connected: $Computer" -ForegroundColor Green
+                if (Test-Port -Ip $Computer -Port 5985 -Timeout $Timeout -Verbose) {
+                    $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred
+                    if ($TestSession) {
+                        $global:Sessions += $TestSession
+                        Write-Host "[INFO] Connected: $Computer" -ForegroundColor Green
+                    }
+                    else {
+                        $global:Denied += $Computer
+                        Write-Host "[ERROR] WinRM 5985 Failed: $Computer" -ForegroundColor Red
+                    }
+                }
+                elseif (Test-Port -Ip $Computer -Port 5986 -Timeout $Timeout -Verbose) {
+                    $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred -UseSSL -SessionOption @{SkipCACheck=$true;SkipCNCheck=$true;SkipRevocationCheck=$true}
+                    if ($TestSession) {
+                        $global:Sessions += $TestSession
+                        Write-Host "[INFO] Connected SSL: $Computer" -ForegroundColor Green
+                    }
+                    else {
+                        $global:Denied += $Computer
+                        Write-Host "[ERROR] WinRM 5986 Failed: $Computer" -ForegroundColor Red
+                    }
                 }
                 else {
                     $global:Denied += $Computer
-                    Write-Host "[ERROR] Failed: $Computer" -ForegroundColor Red
+                    Write-Host "[ERROR] WinRM Ports Closed: $Computer" -ForegroundColor Red
                 }
+                
             }
         }
     }
@@ -112,15 +169,33 @@ if ($Connect) {
                 Write-Host "$Computer"
             }
             foreach ($Computer in $Computers) {
-                $TestSession = New-PSSession -ComputerName $Computer
-                if ($TestSession) {
-                    $global:Sessions += $TestSession
-                    Write-Host "[INFO] Connected: $Computer" -ForegroundColor Green
+                if (Test-Port -Ip $Computer -Port 5985 -Timeout $Timeout -Verbose) {
+                    $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred
+                    if ($TestSession) {
+                        $global:Sessions += $TestSession
+                        Write-Host "[INFO] Connected: $Computer" -ForegroundColor Green
+                    }
+                    else {
+                        $global:Denied += $Computer
+                        Write-Host "[ERROR] WinRM 5985 Failed: $Computer" -ForegroundColor Red
+                    }
+                }
+                elseif (Test-Port -Ip $Computer -Port 5986 -Timeout $Timeout -Verbose) {
+                    $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred -UseSSL -SessionOption @{SkipCACheck=$true;SkipCNCheck=$true;SkipRevocationCheck=$true}
+                    if ($TestSession) {
+                        $global:Sessions += $TestSession
+                        Write-Host "[INFO] Connected SSL: $Computer" -ForegroundColor Green
+                    }
+                    else {
+                        $global:Denied += $Computer
+                        Write-Host "[ERROR] WinRM 5986 Failed: $Computer" -ForegroundColor Red
+                    }
                 }
                 else {
                     $global:Denied += $Computer
-                    Write-Host "[ERROR] Failed: $Computer" -ForegroundColor Red
+                    Write-Host "[ERROR] WinRM Ports Closed: $Computer" -ForegroundColor Red
                 }
+                
             }
         }
     }
