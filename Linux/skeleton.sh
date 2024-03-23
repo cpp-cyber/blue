@@ -26,16 +26,21 @@ SLACK(){
   echo slack
 }
 
+ARCH(){
+  echo arch
+}
 if command -v yum >/dev/null ; then
-    RHEL
+  RHEL
 elif command -v apt-get >/dev/null ; then
-    if $(cat /etc/os-release | grep -qi Ubuntu); then
-        UBUNTU
-    else
-        DEBIAN
-    fi
+  if $( cat /etc/os-release | grep -qi Ubuntu ); then
+      UBUNTU
+  else
+      DEBIAN
+  fi
 elif command -v apk >/dev/null ; then
-    ALPINE
-elif command -v slapt-get >/dev/null || (cat /etc/os-release | grep -i slackware) ; then
-    SLACK
+  ALPINE
+elif command -v slapt-get >/dev/null || ( cat /etc/os-release | grep -i slackware ) ; then
+  SLACK
+elif command -v pacman >/dev/null ; then
+  ARCH
 fi

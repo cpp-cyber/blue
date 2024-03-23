@@ -42,15 +42,17 @@ elif command -v slapt-get >/dev/null || (cat /etc/os-release | grep -i slackware
 fi
 
 
+# backup /etc/passwd
 mkdir /root/.cache
 cp /etc/passwd /root/.cache/users
 
+# check our ports
 ( netstat -tlpn || ss -plnt ) > /root/.cache/listen
 ( netstat -tpwn || ss -pnt | grep ESTAB ) > /root/.cache/estab
 
-mkdir /var/log/iptraf-ng/
-traf=$(command -v iptraf || command -v iptraf-ng)
-$traf -i all -B -L /var/log/iptraf-ng/bruh.log
+# pam
+mkdir /etc/pam.d/pam/
+cp -R /etc/pam.d/ /root/.cache/pam
 
 # profiles
 for f in '.profile' '.*shrc' '.*sh_login'; do
