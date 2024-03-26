@@ -8,6 +8,7 @@
             <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="ModifyList(11)">Remove from Whitelist</button>
             <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="ModifyList(1)">Add to Blacklist</button>
             <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="ModifyList(2)">Remove from Blacklist</button>
+            <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="ModifyMin(5)">Set Min Connection Count</button>
             <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="SendCmd(13)">Enable Blacklist Mode</button>
             <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="SendCmd(14)">Enable Whitelist Mode</button>
             <button type="button" class="btn btn-primary mx-1 mb-1" style="padding: 0.5em 1em; height: 10vh; font-size: 1.75vh" onclick="SendCmd(15)">Clear Whitelist</button>
@@ -76,6 +77,19 @@
         socket.send(JSON.stringify({
             "OpCode": opcode,
             "CIDR": cidr
+        }));
+    }
+
+    function ModifyMin() {
+        var min = document.getElementById("cidr").value;
+        if (min === "") {
+            alert("Please enter a CIDR");
+            return;
+        }
+        min = parseInt(min);
+        socket.send(JSON.stringify({
+            "OpCode": 5,
+            "Count": min
         }));
     }
 

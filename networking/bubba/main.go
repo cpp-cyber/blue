@@ -53,5 +53,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
+    go handleMsg()
+
     log.Fatalln(router.Run(":80"))
 }

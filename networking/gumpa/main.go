@@ -25,6 +25,8 @@ import (
 )
 
 var (
+    ifaces []pcap.Interface
+
     blacklist []*net.IPNet
     blacklistMode = true
     whitelist []*net.IPNet
@@ -32,14 +34,17 @@ var (
 
     SERVER_IP *string
     hostname, _ = os.Hostname()
+    hostHash string
 
     serverChan = make(chan []byte)
 
     connMap = make(map[string]int)
-    minConnCount = 3
+    minConnCount = 1
 
     rwLock sync.RWMutex
     mu sync.Mutex
+
+    quit = make(chan bool)
 )
 
 func main() {
@@ -68,37 +73,17 @@ func main() {
 
     log.Println("Starting up...")
 
-    ifaces, err := pcap.FindAllDevs()
+    ifaces, err = pcap.FindAllDevs()
     if err != nil {
         log.Println(err)
     }
-
     blacklist = appendFilter("224.0.0.0/3", blacklist)
 
-    hostHash := fmt.Sprint(hash(hostname))
+    hostHash = fmt.Sprint(hash(hostname))
     RegisterAgent(hostHash, key)
 
-    conn := initializeWebSocket(*SERVER_IP, "/ws/agent")
-    defer conn.Close()
-
-    go checkin(hostHash)
-    go readFilter(conn)
-
-    for _, device := range ifaces {
-        log.Printf("Interface Name: %s", device.Name)
-        go capturePackets(device.Name)
-    }
-
-    for {
-        select {
-        case t := <-serverChan:
-            err = conn.WriteMessage(websocket.TextMessage, t)
-            if err != nil {
-                log.Println(err)
-                return
-            }
-        }
-    }
+    go initializeWebSocket(*SERVER_IP, "/ws/agent")
+    select {}
 }
 
 func capturePackets(iface string) {
@@ -265,14 +250,38 @@ func isInterfaceUp(interfaceName string) bool {
     return iface.Flags&net.FlagUp != 0
 }
 
-func initializeWebSocket(server, path string) *websocket.Conn {
+func initializeWebSocket(server, path string) {
     log.Println("Initializing WebSocket...")
     url := url.URL{Scheme: "ws", Host: server, Path: path}
     conn, _, err := websocket.DefaultDialer.Dial(url.String(), nil)
     if err != nil {
-        log.Println(err)
+        fmt.Println(err)
+        time.Sleep(5 * time.Second)
+        go initializeWebSocket(server, path)
+        return
     }
-    return conn
+
+    go checkin(hostHash)
+    go readFilter(conn)
+
+    for _, device := range ifaces {
+        log.Printf("Interface Name: %s", device.Name)
+        go capturePackets(device.Name)
+    }
+
+    for {
+        select {
+        case t := <-serverChan:
+            fmt.Println(string(t))
+            err = conn.WriteMessage(websocket.TextMessage, t)
+            if err != nil {
+                log.Println(err)
+                return
+            }
+        case <-quit:
+            return
+        }
+    }
 }
 
 func RegisterAgent(hash, key string) {
@@ -311,6 +320,11 @@ func readFilter(conn *websocket.Conn) {
         _, msg, err := conn.ReadMessage()
         if err != nil {
             fmt.Println(err)
+            quit <- true
+            conn.Close()
+            time.Sleep(5 * time.Second)
+            go initializeWebSocket(*SERVER_IP, "/ws/agent")
+            return
         } else {
             filter := make(map[string]interface{})
             err := json.Unmarshal(msg, &filter)

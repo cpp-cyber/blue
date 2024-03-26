@@ -62,8 +62,6 @@ func handleWebSocket(conn *websocket.Conn) {
         }
 
         agentChan <- jsonData
-        sendToAgents(msg)
-
     }
 }
 
@@ -124,13 +122,7 @@ func handleMsg() {
                 log.Println(err)
                 return
             }
-            ip := msg["IP"].(string)
-            for client := range agentClients {
-                clientIP := strings.Split(client.NetConn().RemoteAddr().String(), ":")[0]
-                if ip == clientIP {
-                    client.WriteMessage(websocket.TextMessage, jsonData)
-                }
-            }
+            sendToAgents(jsonData)
         case msg := <-connChan:
             if msg["OpCode"].(float64) == 5 {
                 AddConnection(msg)
