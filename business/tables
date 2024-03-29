@@ -1,3 +1,21 @@
+Sub FALLIN()
+
+    Dim oSel As Object
+    Dim leftMargin As Long
+    Dim rightMargin As Long
+
+    oSel = ThisComponent.CurrentSelection
+
+    leftMargin = 0
+    rightMargin = 0
+
+    If oSel.supportsService("com.sun.star.text.TextTableCursor") Then
+        oSel.ParaLeftMargin = leftMargin
+        oSel.ParaRightMargin = rightMargin
+    End If
+
+End Sub
+
 Sub PRIMARY(myTable As Object)
 
   Dim oSel As Object
