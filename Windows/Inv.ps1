@@ -1,33 +1,13 @@
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Unrestricted -Force
 
 #Hostname and IP
-Write-Output "#### Start Hostname ####" 
+Write-Output "#### Start Hostname ####"
 Get-WmiObject -Namespace root\cimv2 -Class Win32_ComputerSystem | Select-Object Name, Domain
 Write-Output "#### End Hostname ####" 
 
 Write-Output "#### Start IP ####" 
-Get-WmiObject Win32_NetworkAdapterConfiguration | ? {$_.IpAddress -ne $null} | % {$_.IPAddress} | Where-Object { [System.Net.IPAddress]::Parse($_).AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork }
+Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object {$_.IpAddress -ne $null} | ForEach-Object {$_.IPAddress} | Where-Object { [System.Net.IPAddress]::Parse($_).AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork }
 Write-Output "#### End IP ####"
-
-$DC = Get-WmiObject -Query "select * from Win32_OperatingSystem where ProductType='2'"
-if ($DC) {
-    Write-Output "`n#### DC Detected ####"
-
-    Write-Output "`n#### Start DNS Records ####"
-    try {
-        Get-DnsServerResourceRecord -ZoneName $($(Get-ADDomain).DNSRoot) | ? {$_.RecordType -notmatch "SRV|NS|SOA" -and $_.HostName -notmatch "@|DomainDnsZones|ForestDnsZones"} | Format-Table
-    }
-    catch {
-        Write-Output "[ERROR] Failed to get DNS records, DC likely too old"
-    }
-    Write-Output "#### End DNS Records ####"
-}
-
-if (Get-Service -Name W3SVC -ErrorAction SilentlyContinue) {
-    $IIS = $true
-    Import-Module WebAdministration
-    Write-Output "#### IIS Detected ####" 
-}
 
 Write-Output "`n#### Current Admin ####" 
 whoami.exe
@@ -35,20 +15,69 @@ whoami.exe
 Write-Output "`n#### OS ####" 
 (Get-WMIObject win32_operatingsystem).caption
 
-Write-Output "`n#### Start DNS Servers ####" 
-$dnsAddresses = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | 
-    Where-Object { $_.OperationalStatus -eq 'Up' -and $_.NetworkInterfaceType -ne 'Loopback' } | 
-    ForEach-Object { $_.GetIPProperties().DnsAddresses }
+$DC = Get-WmiObject -Query "select * from Win32_OperatingSystem where ProductType='2'"
+if ($DC) {
+    Write-Output "`n#### DC Detected ####"
 
-$dnsAddresses | Select-Object -ExpandProperty IPAddressToString
-Write-Output "#### End DNS Servers ####" 
+    Write-Output "`n#### Start DNS Records ####"
+    try {
+        Get-DnsServerResourceRecord -ZoneName $($(Get-ADDomain).DNSRoot) | Where-Object {$_.RecordType -notmatch "SRV|NS|SOA" -and $_.HostName -notmatch "@|DomainDnsZones|ForestDnsZones"} | Format-Table
+    }
+    catch {
+        Write-Output "[ERROR] Failed to get DNS records, DC likely too old"
+    }
+    Write-Output "#### End DNS Records ####"
+}
 
-#SMB Shares
+function Get-SharePerms {
+    param (
+        [string]$ShareName
+    )
+    $SharePermissions = net share $ShareName | Select-Object -Skip 6 | Select-Object -SkipLast 3
+    foreach ($SharePermission in $SharePermissions) {
+        $SharePermission = $SharePermission -replace '\s+', '' -replace '.*Permission'
+        $SharePermissionString += $SharePermission + "`n"
+    }
+    return $SharePermissionString
+}
+
 Write-Output "#### Start SMB Shares ####" 
-Get-WmiObject -Class Win32_Share | Select-Object Name,Path
+$Shares = Get-WmiObject Win32_Share
+$ShareInfo = @()
+foreach ($Share in $Shares) {
+    $ShareInfo += New-Object PSObject -Property @{
+        "Name" = $Share.Name
+        "Path" = $Share.Path
+        "Description" = $Share.Description
+        "Permissions" = (Get-SharePerms -ShareName $Share.Name)
+    }
+}
+$ShareInfo | Select-Object Name, Path, Description, Permissions | Format-Table -AutoSize -Wrap
 Write-Output "#### End SMB Shares ####" 
 
-if ($IIS) {
+Write-Output "`n#### Start General Service Detection ####"
+$Services = @()
+$CheckServices = @("mssql", "mysql", "mariadb", "pgsql", "apache", "nginx", "tomcat", "httpd", "mongo", "ftp", "filezilla", "ssh", "vnc")
+foreach ($CheckService in $CheckServices) {
+    $SvcQuery = Get-WmiObject win32_service | Where-Object {$_.Name -like "*$CheckService*"}
+    if ($SvcQuery.GetType().IsArray) {
+        foreach ($Svc in $SvcQuery) {
+            $Services += $Svc
+            
+        }
+    }
+    elseif ($SvcQuery) {
+        $Services += $SvcQuery
+    }
+}
+
+$Services | Select-Object Name, DisplayName, State, PathName | Format-Table -AutoSize -Wrap
+
+Write-Output "`n#### End General Service Detection ####"
+
+if (Get-Service -Name W3SVC -ErrorAction SilentlyContinue) {
+    Write-Output "#### IIS Detected ####"
+    Import-Module WebAdministration
     Write-Output "`n#### Start IIS Site Bindings ####"
     $websites = Get-ChildItem IIS:\Sites | Sort-Object name
 
@@ -68,7 +97,41 @@ if ($IIS) {
     Write-Output "#### End IIS Site Bindings ####"
 }
 
-#Installed Programs
+Write-Output "`n#### Start NSSM Services ####"
+Get-WmiObject win32_service | Where-Object {$_.PathName -like '*nssm*'} | Select-Object Name, DisplayName, State, PathName
+Write-Output "#### End NSSM Services ####"
+
+Write-Output "`n#### Start TCP Connections ####"
+function Get-TcpConnections {
+    $connections = netstat -anop TCP | Where-Object { $_ -match '\s+TCP\s+' }
+    $connectionInfo = @()
+
+    foreach ($connection in $connections) {
+        $cols = $connection -split '\s+'
+        $localAddress = $cols[2].Split(":")[0]
+        $localPort = $cols[2].Split(":")[-1]
+        $remoteAddress = $cols[3].Split(":")[0]
+        $remotePort = $cols[3].Split(":")[-1]
+        $state = $cols[4]
+        $processpid = $cols[-1]
+
+        $connectionInfo += New-Object PSObject -Property @{
+            "LocalAddress" = $localAddress
+            "LocalPort" = $localPort
+            "RemoteAddress" = $remoteAddress
+            "RemotePort" = $remotePort
+            "State" = $state
+            "PID" = $processpid
+            "ProcessName" = (Get-Process -Id $processpid).ProcessName
+        }
+    }
+
+    return $connectionInfo
+}
+$TCPConnections = Get-TcpConnections
+
+$TCPConnections | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, State, PID, ProcessName | Format-Table -AutoSize
+Write-Output "`n#### End TCP Connections ####"
 
 Write-Output "`n#### Start Installed Programs ####" 
 $programs = foreach ($UKey in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\SOFTWARE\Wow6432node\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\SOFTWARE\Wow6432node\Microsoft\Windows\CurrentVersion\Uninstall\*') {
@@ -89,7 +152,7 @@ if ($DC) {
     $Groups | ForEach-Object {
         $Users = Get-ADGroupMember -Identity $_ | Select-Object -ExpandProperty Name
         if ($Users.Count -gt 0) {
-            $Users = $Users | % { "   Member: $_"}
+            $Users = $Users | ForEach-Object { "   Member: $_"}
             Write-Output "Group: $_" $Users
         }
     }
@@ -116,7 +179,14 @@ Write-Output "`n#### Start ALL Users ####"
 Get-WmiObject win32_useraccount | ForEach-Object {$_.Name}
 Write-Output "`n#### End ALL Users ####" 
 
-#RunKeys
+Write-Output "`n#### Start DNS Servers ####" 
+$dnsAddresses = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | 
+    Where-Object { $_.OperationalStatus -eq 'Up' -and $_.NetworkInterfaceType -ne 'Loopback' } | 
+    ForEach-Object { $_.GetIPProperties().DnsAddresses }
+
+$dnsAddresses | Select-Object -ExpandProperty IPAddressToString
+Write-Output "#### End DNS Servers ####"
+
 Write-Output "`n#### Start Registry Startups ####" 
 $regPath = @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", 
             "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnceEx", 
@@ -176,5 +246,5 @@ Write-Output "#### End Scheduled Tasks ####"
 
 #Windows Features
 Write-Output "`n#### Start Features ####" 
-dism /online /get-features /Format:Table | Select-String Enabled | %{ $_.ToString().Split(" ")[0].Trim()} | sort.exe
+dism /online /get-features /Format:Table | Select-String Enabled | ForEach-Object { $_.ToString().Split(" ")[0].Trim()} | sort.exe
 Write-Output "#### End Features ####"
