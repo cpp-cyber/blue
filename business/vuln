@@ -18,16 +18,18 @@ End Sub
 
 Sub PRIMARY(myTable As Object)
 
-  Dim oSel As Object
-  oSel = ThisComponent.CurrentSelection
-  If oSel.supportsService("com.sun.star.text.TextTableCursor") Then oSel.BackColor = RGB(232, 162, 2)
+    Dim oSel As Object
+    oSel = ThisComponent.CurrentSelection
+    If oSel.supportsService("com.sun.star.text.TextTableCursor") Then oSel.BackColor = RGB(232, 162, 2)
+
 End Sub
 
 Sub SECONDARY(myTable As Object)
 
-  Dim oSel As Object
-  oSel = ThisComponent.CurrentSelection
-  If oSel.supportsService("com.sun.star.text.TextTableCursor") Then oSel.BackColor = RGB(178, 178, 178)
+    Dim oSel As Object
+    oSel = ThisComponent.CurrentSelection
+    If oSel.supportsService("com.sun.star.text.TextTableCursor") Then oSel.BackColor = RGB(178, 178, 178)
+    
 End Sub
 
 ' CREATE VULN SCAN TABLE
