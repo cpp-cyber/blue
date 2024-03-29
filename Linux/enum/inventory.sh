@@ -297,12 +297,15 @@ if checkService "$SERVICES"  'mysql' | grep -qi "is on this machine"; then
     sql_test
 fi
 
-if checkService "$SERVICES"  'mariadb' 'mysql' | grep -qi "is on this machine"; then 
+if checkService "$SERVICES"  'mariadb' | grep -qi "is on this machine"; then 
     MARIADB=true
-    checkService "$SERVICES"  'mariadb' 'mysql'
+    checkService "$SERVICES"  'mariadb'
     sql_test
 fi
-
+if checkService "$SERVICES" 'mssql-server' | grep -qi "is on this machine" ; then
+    sqlserver=true
+    checkService "$SERVICES" 'mssql-server' 'sqlservr'
+fi
 if checkService "$SERVICES"  'postgres' | grep -qi "is on this machine" ; then
     POSTGRESQL=true
     checkService "$SERVICES" 'postgres' || checkService "$SERVICES" 'postgres' 'postmaster'
