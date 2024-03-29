@@ -58,26 +58,6 @@ foreach ($Share in $Shares) {
 $ShareInfo | Select-Object Name, Path, Description, Permissions | Format-Table -AutoSize -Wrap
 Write-Output "#### End SMB Shares ####" 
 
-Write-Output "`n#### Start General Service Detection ####"
-$Services = @()
-$CheckServices = @("mssql", "mysql", "mariadb", "pgsql", "apache", "nginx", "tomcat", "httpd", "mongo", "ftp", "filezilla", "ssh", "vnc")
-foreach ($CheckService in $CheckServices) {
-    $SvcQuery = Get-WmiObject win32_service | Where-Object { $_.Name -like "*$CheckService*" }
-    if ($SvcQuery.GetType().IsArray) {
-        foreach ($Svc in $SvcQuery) {
-            $Services += $Svc
-            
-        }
-    }
-    elseif ($SvcQuery) {
-        $Services += $SvcQuery
-    }
-}
-
-$Services | Select-Object Name, DisplayName, State, PathName | Format-Table -AutoSize -Wrap
-
-Write-Output "`n#### End General Service Detection ####"
-
 if (Get-Service -Name W3SVC -ErrorAction SilentlyContinue) {
     Write-Output "#### IIS Detected ####"
     Import-Module WebAdministration
@@ -100,8 +80,31 @@ if (Get-Service -Name W3SVC -ErrorAction SilentlyContinue) {
     Write-Output "#### End IIS Site Bindings ####"
 }
 
+Write-Output "`n#### Start General Service Detection ####"
+$Services = @()
+$CheckServices = @("mssql", "mysql", "mariadb", "pgsql", "apache", "nginx", "tomcat", "httpd", "mongo", "ftp", "filezilla", "ssh", "vnc")
+foreach ($CheckService in $CheckServices) {
+    $SvcQuery = Get-WmiObject win32_service | Where-Object { $_.Name -like "*$CheckService*" }
+    if ($null -ne $SvcQuery) {
+        if ($SvcQuery.GetType().IsArray) {
+            foreach ($Svc in $SvcQuery) {
+                $Services += $Svc
+                
+            }
+        }
+        elseif ($SvcQuery) {
+            $Services += $SvcQuery
+        }
+    }
+    
+}
+
+$Services | Select-Object Name, DisplayName, State, PathName | Format-Table -AutoSize -Wrap
+
+Write-Output "#### End General Service Detection ####"
+
 Write-Output "`n#### Start NSSM Services ####"
-Get-WmiObject win32_service | Where-Object { $_.PathName -like '*nssm*' } | Select-Object Name, DisplayName, State, PathName
+Get-WmiObject win32_service | Where-Object { $_.PathName -like '*nssm*' } | Select-Object Name, DisplayName, State, PathName | Format-Table -AutoSize -Wrap
 Write-Output "#### End NSSM Services ####"
 
 Write-Output "`n#### Start TCP Connections ####"

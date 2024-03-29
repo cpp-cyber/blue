@@ -210,15 +210,9 @@ if (($Script -ne '') -and ($global:Sessions.Count -gt 0) -and ($Out -ne '')) {
     do {
         $Extension = ""
         $Script = $Script.ToLower()
-        $i = 0
-
-        while ($Script[$i] -ne '.') {
-          $Extension += ($Script[$i])
-          $i++
-        } 
-        
-        $Extension += ".$(Get-Random -Maximum 1000)"
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ;wininit
+        $ScriptName = $Script.Split(".")[-2]
+        $Extension += $ScriptName.Substring(1)
+        $Extension += ".$(Get-Random -Maximum 1000)";
     } while (Test-Path "$Out\*.$Extension")
 
     foreach ($Session in $global:Sessions) {
