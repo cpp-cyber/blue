@@ -19,8 +19,19 @@ Get-WmiObject Win32_NetworkAdapterConfiguration | ? { $_.IpAddress -ne $null } |
 $GPOs = get-gpo -ALL
 
 foreach ($GPO in $GPOs) {
-  $GPO.GpoStatus = "AllSettingsDisabled"
-  Write-Output "GPO $($GPO.DisplayName) status set to AllSettingsDisabled"
+    $GPO.GpoStatus = "AllSettingsDisabled"
+    Write-Output "GPO $($GPO.DisplayName) status set to AllSettingsDisabled"
 }
 
 Write-Output "$Env:ComputerName [INFO] Set GPOs"
+
+if ($Error[0]) {
+    Write-Output "`n#########################"
+    Write-Output "#        ERRORS         #"
+    Write-Output "#########################`n"
+
+
+    foreach ($err in $error) {
+        Write-Output $err
+    }
+}

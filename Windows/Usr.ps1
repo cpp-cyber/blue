@@ -1,11 +1,11 @@
 param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [String]$Admin,
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [String]$P1,
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [String]$P2
 )
 
@@ -26,7 +26,7 @@ Get-WmiObject -Namespace root\cimv2 -Class Win32_ComputerSystem | Select-Object 
 Write-Output "#########################"
 Write-Output "#          IP           #"
 Write-Output "#########################"
-Get-WmiObject Win32_NetworkAdapterConfiguration | ? {$_.IpAddress -ne $null} | % {$_.ServiceName + "`n" + $_.IPAddress + "`n"}
+Get-WmiObject Win32_NetworkAdapterConfiguration | ? { $_.IpAddress -ne $null } | % { $_.ServiceName + "`n" + $_.IPAddress + "`n" }
 $Error.Clear()
 $ErrorActionPreference = "SilentlyContinue"
 $DC = $false
@@ -37,7 +37,7 @@ if (Get-WmiObject -Query "select * from Win32_OperatingSystem where ProductType=
 
 
 if (!$DC) {
-    Get-WmiObject -class win32_useraccount | ForEach-Object {net user $_.name $P1 > $null}
+    Get-WmiObject -class win32_useraccount | ForEach-Object { net user $_.name $P1 > $null }
     Write-Output "$Env:ComputerName [INFO] User password changed"
     net user $Admin $P2 /add /y | Out-Null
     Write-Output "$Env:ComputerName [INFO] User $Admin created"
@@ -47,7 +47,13 @@ if (!$DC) {
     Write-Output "$Env:ComputerName [INFO] User $Admin added to groups"
 }
 
-if ($Error.Count -gt 0) {
-    Write-Output "$Env:ComputerName [WARNING] Errors Detected"
-    $Error | Out-File $env:USERPROFILE\Desktop\Users.txt -Append -Encoding utf8
+if ($Error[0]) {
+    Write-Output "`n#########################"
+    Write-Output "#        ERRORS         #"
+    Write-Output "#########################`n"
+
+
+    foreach ($err in $error) {
+        Write-Output $err
+    }
 }

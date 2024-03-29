@@ -1,12 +1,15 @@
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Unrestricted -Force
 
+$Error.Clear()
+$ErrorActionPreference = "SilentlyContinue"
+
 #Hostname and IP
 Write-Output "#### Start Hostname ####"
 Get-WmiObject -Namespace root\cimv2 -Class Win32_ComputerSystem | Select-Object Name, Domain
 Write-Output "#### End Hostname ####" 
 
 Write-Output "#### Start IP ####" 
-Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object {$_.IpAddress -ne $null} | ForEach-Object {$_.IPAddress} | Where-Object { [System.Net.IPAddress]::Parse($_).AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork }
+Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object { $_.IpAddress -ne $null } | ForEach-Object { $_.IPAddress } | Where-Object { [System.Net.IPAddress]::Parse($_).AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork }
 Write-Output "#### End IP ####"
 
 Write-Output "`n#### Current Admin ####" 
@@ -21,7 +24,7 @@ if ($DC) {
 
     Write-Output "`n#### Start DNS Records ####"
     try {
-        Get-DnsServerResourceRecord -ZoneName $($(Get-ADDomain).DNSRoot) | Where-Object {$_.RecordType -notmatch "SRV|NS|SOA" -and $_.HostName -notmatch "@|DomainDnsZones|ForestDnsZones"} | Format-Table
+        Get-DnsServerResourceRecord -ZoneName $($(Get-ADDomain).DNSRoot) | Where-Object { $_.RecordType -notmatch "SRV|NS|SOA" -and $_.HostName -notmatch "@|DomainDnsZones|ForestDnsZones" } | Format-Table
     }
     catch {
         Write-Output "[ERROR] Failed to get DNS records, DC likely too old"
@@ -46,8 +49,8 @@ $Shares = Get-WmiObject Win32_Share
 $ShareInfo = @()
 foreach ($Share in $Shares) {
     $ShareInfo += New-Object PSObject -Property @{
-        "Name" = $Share.Name
-        "Path" = $Share.Path
+        "Name"        = $Share.Name
+        "Path"        = $Share.Path
         "Description" = $Share.Description
         "Permissions" = (Get-SharePerms -ShareName $Share.Name)
     }
@@ -59,7 +62,7 @@ Write-Output "`n#### Start General Service Detection ####"
 $Services = @()
 $CheckServices = @("mssql", "mysql", "mariadb", "pgsql", "apache", "nginx", "tomcat", "httpd", "mongo", "ftp", "filezilla", "ssh", "vnc")
 foreach ($CheckService in $CheckServices) {
-    $SvcQuery = Get-WmiObject win32_service | Where-Object {$_.Name -like "*$CheckService*"}
+    $SvcQuery = Get-WmiObject win32_service | Where-Object { $_.Name -like "*$CheckService*" }
     if ($SvcQuery.GetType().IsArray) {
         foreach ($Svc in $SvcQuery) {
             $Services += $Svc
@@ -98,7 +101,7 @@ if (Get-Service -Name W3SVC -ErrorAction SilentlyContinue) {
 }
 
 Write-Output "`n#### Start NSSM Services ####"
-Get-WmiObject win32_service | Where-Object {$_.PathName -like '*nssm*'} | Select-Object Name, DisplayName, State, PathName
+Get-WmiObject win32_service | Where-Object { $_.PathName -like '*nssm*' } | Select-Object Name, DisplayName, State, PathName
 Write-Output "#### End NSSM Services ####"
 
 Write-Output "`n#### Start TCP Connections ####"
@@ -116,13 +119,13 @@ function Get-TcpConnections {
         $processpid = $cols[-1]
 
         $connectionInfo += New-Object PSObject -Property @{
-            "LocalAddress" = $localAddress
-            "LocalPort" = $localPort
+            "LocalAddress"  = $localAddress
+            "LocalPort"     = $localPort
             "RemoteAddress" = $remoteAddress
-            "RemotePort" = $remotePort
-            "State" = $state
-            "PID" = $processpid
-            "ProcessName" = (Get-Process -Id $processpid).ProcessName
+            "RemotePort"    = $remotePort
+            "State"         = $state
+            "PID"           = $processpid
+            "ProcessName"   = (Get-Process -Id $processpid).ProcessName
         }
     }
 
@@ -134,9 +137,9 @@ $TCPConnections | Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePo
 Write-Output "`n#### End TCP Connections ####"
 
 Write-Output "`n#### Start Installed Programs ####" 
-$programs = foreach ($UKey in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\SOFTWARE\Wow6432node\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\SOFTWARE\Wow6432node\Microsoft\Windows\CurrentVersion\Uninstall\*') {
+$programs = foreach ($UKey in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKLM:\SOFTWARE\Wow6432node\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKCU:\SOFTWARE\Wow6432node\Microsoft\Windows\CurrentVersion\Uninstall\*') {
     foreach ($Product in (Get-ItemProperty $UKey -ErrorAction SilentlyContinue)) {
-        if($Product.DisplayName -and $Product.SystemComponent -ne 1) {
+        if ($Product.DisplayName -and $Product.SystemComponent -ne 1) {
             $Product.DisplayName + " - " + $Product.DisplayVersion
         }
     }
@@ -152,11 +155,12 @@ if ($DC) {
     $Groups | ForEach-Object {
         $Users = Get-ADGroupMember -Identity $_ | Select-Object -ExpandProperty Name
         if ($Users.Count -gt 0) {
-            $Users = $Users | ForEach-Object { "   Member: $_"}
+            $Users = $Users | ForEach-Object { "   Member: $_" }
             Write-Output "Group: $_" $Users
         }
     }
-} else {
+}
+else {
     # Get a list of all local groups
     $localGroups = [ADSI]"WinNT://localhost"
 
@@ -176,35 +180,35 @@ if ($DC) {
 Write-Output "#### End Group Membership ####" 
 
 Write-Output "`n#### Start ALL Users ####" 
-Get-WmiObject win32_useraccount | ForEach-Object {$_.Name}
+Get-WmiObject win32_useraccount | ForEach-Object { $_.Name }
 Write-Output "`n#### End ALL Users ####" 
 
 Write-Output "`n#### Start DNS Servers ####" 
 $dnsAddresses = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | 
-    Where-Object { $_.OperationalStatus -eq 'Up' -and $_.NetworkInterfaceType -ne 'Loopback' } | 
-    ForEach-Object { $_.GetIPProperties().DnsAddresses }
+Where-Object { $_.OperationalStatus -eq 'Up' -and $_.NetworkInterfaceType -ne 'Loopback' } | 
+ForEach-Object { $_.GetIPProperties().DnsAddresses }
 
 $dnsAddresses | Select-Object -ExpandProperty IPAddressToString
 Write-Output "#### End DNS Servers ####"
 
 Write-Output "`n#### Start Registry Startups ####" 
 $regPath = @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", 
-            "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnceEx", 
-            "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce", 
-            "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", 
-            "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce", 
-            "HKLM:\SYSTEM\CurrentControlSet\Control\SafeBoot\AlternateShell", 
-            "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\AlternateShells\AvailableShells", 
-            "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components", 
-            "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunServicesOnce", 
-            "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunServicesOnce", 
-            "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunServices", 
-            "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunServices", 
-            "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit", 
-            "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell", 
-            "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Windows")
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnceEx", 
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce", 
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", 
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce", 
+    "HKLM:\SYSTEM\CurrentControlSet\Control\SafeBoot\AlternateShell", 
+    "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\AlternateShells\AvailableShells", 
+    "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components", 
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunServicesOnce", 
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunServicesOnce", 
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunServices", 
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\RunServices", 
+    "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit", 
+    "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell", 
+    "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Windows")
 foreach ($item in $regPath) {
-    try{
+    try {
         $reg = Get-ItemProperty -Path $item -ErrorAction SilentlyContinue
         Write-Output "[Registry Startups] $item" 
         $reg | Get-Member -MemberType NoteProperty -ErrorAction SilentlyContinue | Select-Object -Expand Name | ForEach-Object {
@@ -216,7 +220,7 @@ foreach ($item in $regPath) {
             }
         }
     }
-    catch{
+    catch {
         Write-Output "[Registry Startup] $item Not Found" 
     }
 }
@@ -230,7 +234,7 @@ $taskList = @()
 for ($i = 0; $i -lt $tasks.Tasks.'#comment'.Count; $i++) {
     $taskList += [PSCustomObject] @{
         TaskName = $tasks.Tasks.'#comment'[$i]
-        Task = $tasks.Tasks.Task[$i]
+        Task     = $tasks.Tasks.Task[$i]
     }
 }
 $filteredTasks = $taskList | Where-Object {
@@ -246,5 +250,15 @@ Write-Output "#### End Scheduled Tasks ####"
 
 #Windows Features
 Write-Output "`n#### Start Features ####" 
-dism /online /get-features /Format:Table | Select-String Enabled | ForEach-Object { $_.ToString().Split(" ")[0].Trim()} | sort.exe
+dism /online /get-features /Format:Table | Select-String Enabled | ForEach-Object { $_.ToString().Split(" ")[0].Trim() } | sort.exe
 Write-Output "#### End Features ####"
+
+if ($Error[0]) {
+    Write-Output "`n#########################"
+    Write-Output "#        ERRORS         #"
+    Write-Output "#########################`n"
+
+    foreach ($err in $error) {
+        Write-Output $err
+    }
+}
