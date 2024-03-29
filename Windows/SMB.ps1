@@ -14,9 +14,9 @@ Get-WmiObject -Namespace root\cimv2 -Class Win32_ComputerSystem | Select-Object 
 Write-Output "#########################"
 Write-Output "#          IP           #"
 Write-Output "#########################"
-Get-WmiObject Win32_NetworkAdapterConfiguration | ? {$_.IpAddress -ne $null} | % {$_.ServiceName + "`n" + $_.IPAddress + "`n"}
+Get-WmiObject Win32_NetworkAdapterConfiguration | ? { $_.IpAddress -ne $null } | % { $_.ServiceName + "`n" + $_.IPAddress + "`n" }
 ######### SMB #########
-# reg add "HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" /v SMB1 /t REG_DWORD /d 0 /f | Out-Null
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" /v SMB1 /t REG_DWORD /d 0 /f | Out-Null
 reg add "HKLM\System\CurrentControlSet\Services\LanManWorkstation\Parameters" /v RequireSecuritySignature /t REG_DWORD /d 1 /f | Out-Null
 reg add "HKLM\System\CurrentControlSet\Services\LanManWorkstation\Parameters" /v EnableSecuritySignature /t REG_DWORD /d 1 /f | Out-Null
 reg add "HKLM\System\CurrentControlSet\Services\LanmanServer\Parameters" /v RequireSecuritySignature /t REG_DWORD /d 1 /f | Out-Null
@@ -28,4 +28,13 @@ reg add "HKLM\System\CurrentControlSet\Services\LanmanServer\Parameters" /v Enab
 #net share ADMIN$ /delete | Out-Null
 Write-Output "$Env:ComputerName SMB shares deleted and settings applied"
 
-$Error | Out-File $env:USERPROFILE\Desktop\SMB.txt -Append -Encoding utf8
+if ($Error[0]) {
+    Write-Output "`n#########################"
+    Write-Output "#        ERRORS         #"
+    Write-Output "#########################`n"
+
+
+    foreach ($err in $error) {
+        Write-Output $err
+    }
+}

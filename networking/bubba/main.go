@@ -13,6 +13,9 @@ var (
     HostCount int
     agentClients = make(map[*websocket.Conn]bool)
     webClients = make(map[*websocket.Conn]bool)
+    statusChan = make(chan map[string]interface{})
+    agentChan = make(chan map[string]interface{})
+    connChan = make(chan map[string]interface{})
     db = ConnectToSQLite()
 
     tomlConf = &models.Config{}
@@ -49,6 +52,8 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+    go handleMsg()
 
     log.Fatalln(router.Run(":80"))
 }

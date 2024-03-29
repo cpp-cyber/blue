@@ -16,7 +16,7 @@ Get-WmiObject -Namespace root\cimv2 -Class Win32_ComputerSystem | Select-Object 
 Write-Output "#########################"
 Write-Output "#          IP           #"
 Write-Output "#########################"
-Get-WmiObject Win32_NetworkAdapterConfiguration | ? {$_.IpAddress -ne $null} | % {$_.ServiceName + "`n" + $_.IPAddress + "`n"}
+Get-WmiObject Win32_NetworkAdapterConfiguration | ? { $_.IpAddress -ne $null } | % { $_.ServiceName + "`n" + $_.IPAddress + "`n" }
 
 $DC = $false
 if (Get-WmiObject -Query "select * from Win32_OperatingSystem where ProductType='2'") {
@@ -120,7 +120,7 @@ if ($DC) {
     reg add "HKLM\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters" /v FullSecureChannelProtection /t REG_DWORD /d 1 /f | Out-Null
     Remove-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters" -Name "vulnerablechannelallowlist" -Force | Out-Null
     # CVE-2021-42278 & CVE-2021-42287 (noPac)
-    Set-ADDomain -Identity $env:USERDNSDOMAIN -Replace @{"ms-DS-MachineAccountQuota"="0"} | Out-Null
+    Set-ADDomain -Identity $env:USERDNSDOMAIN -Replace @{"ms-DS-MachineAccountQuota" = "0" } | Out-Null
 }
 
 
@@ -149,4 +149,13 @@ reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v Prom
 reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v EnableInstallerDetection /t REG_DWORD /d 1 /f | Out-Null
 Write-Output "$Env:ComputerName [INFO] UAC enabled"
 
-$Error | Out-File $env:USERPROFILE\Desktop\hard.txt -Append -Encoding utf8
+if ($Error[0]) {
+    Write-Output "`n#########################"
+    Write-Output "#        ERRORS         #"
+    Write-Output "#########################`n"
+
+
+    foreach ($err in $error) {
+        Write-Output $err
+    }
+}

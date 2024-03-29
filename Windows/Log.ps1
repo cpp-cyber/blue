@@ -14,7 +14,7 @@ Get-WmiObject -Namespace root\cimv2 -Class Win32_ComputerSystem | Select-Object 
 Write-Output "#########################"
 Write-Output "#          IP           #"
 Write-Output "#########################"
-Get-WmiObject Win32_NetworkAdapterConfiguration | ? {$_.IpAddress -ne $null} | % {$_.ServiceName + "`n" + $_.IPAddress + "`n"}
+Get-WmiObject Win32_NetworkAdapterConfiguration | ? { $_.IpAddress -ne $null } | % { $_.ServiceName + "`n" + $_.IPAddress + "`n" }
 
 ######### Logging#########
 auditpol /set /category:* /success:enable /failure:enable | Out-Null
@@ -40,13 +40,24 @@ catch {
 
 ######### Sysmon Setup #########
 if ($Env:PROCESSOR_ARCHITECTURE -eq "AMD64") {
-    C:\Windows\System32\Sysmon64.exe -accepteula -i C:\Windows\System32\smce.xml
+    C:\Windows\System32\Sysmon64.exe -accepteula -i
+    C:\Windows\System32\Sysmon64.exe -c C:\Windows\System32\smce.xml
     Write-Output "$Env:ComputerName [INFO] Sysmon64 installed and configured"
 }
 else {
-    C:\Windows\System32\Sysmon.exe -accepteula -i C:\Windows\System32\smce.xml
+    C:\Windows\System32\Sysmon.exe -accepteula -i 
+    C:\Windows\System32\Sysmon.exe -c C:\Windows\System32\smce.xml
     Write-Output "$Env:ComputerName [INFO] Sysmon32 installed and configured"
 }
 
 
-$Error | Out-File $env:USERPROFILE\Desktop\log.txt -Append -Encoding utf8
+if ($Error[0]) {
+    Write-Output "`n#########################"
+    Write-Output "#        ERRORS         #"
+    Write-Output "#########################`n"
+
+
+    foreach ($err in $error) {
+        Write-Output $err
+    }
+}

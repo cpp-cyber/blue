@@ -15,7 +15,7 @@ Get-WmiObject -Namespace root\cimv2 -Class Win32_ComputerSystem | Select-Object 
 Write-Output "#########################"
 Write-Output "#          IP           #"
 Write-Output "#########################"
-Get-WmiObject Win32_NetworkAdapterConfiguration | ? {$_.IpAddress -ne $null} | % {$_.ServiceName + "`n" + $_.IPAddress + "`n"}
+Get-WmiObject Win32_NetworkAdapterConfiguration | ? { $_.IpAddress -ne $null } | % { $_.ServiceName + "`n" + $_.IPAddress + "`n" }
 
 ######### Reset Policies #########
 Copy-Item C:\Windows\System32\GroupPolicy* C:\gp -Recurse | Out-Null
@@ -56,10 +56,21 @@ reg add "HKCU\Keyboard Layout\Preload" /v 1 /t REG_SZ /d "00000409" /f | Out-Nul
 # set UI lang to english
 reg add "HKCU\Control Panel\Desktop" /v PreferredUILanguages /t REG_SZ /d en-US /f | Out-Null
 reg add "HKLM\Software\Policies\Microsoft\MUI\Settings" /v PreferredUILanguages /t REG_SZ /d en-US /f | Out-Null
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Nls\Language" /v InstallLanguage /t REG_SZ /d 0409 /f | Out-Null
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Nls\Language" /v Default /t REG_SZ /d 0409 /f | Out-Null
 Write-Output "$Env:ComputerName [INFO] Font, Themes, and Languages set to default"
 
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Hidden /t REG_DWORD /d 1 /f | Out-Null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /V HideFileExt /T REG_DWORD /D 0 /F | Out-Null
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowSuperHidden /t REG_DWORD /d 1 /F | Out-Null
 
-$Error | Out-File $env:USERPROFILE\Desktop\fix.txt -Append -Encoding utf8
+if ($Error[0]) {
+    Write-Output "`n#########################"
+    Write-Output "#        ERRORS         #"
+    Write-Output "#########################`n"
+
+
+    foreach ($err in $error) {
+        Write-Output $err
+    }
+}
