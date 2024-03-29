@@ -13,7 +13,7 @@ Write-Output "#########################"
 Get-WmiObject -Namespace root\cimv2 -Class Win32_ComputerSystem | Select-Object Name, Domain
 Write-Output "#########################"
 Write-Output "#          IP           #"
-Write-Output "#########################"
+Write-Output "#########################`n"
 Get-WmiObject Win32_NetworkAdapterConfiguration | ? { $_.IpAddress -ne $null } | % { $_.ServiceName + "`n" + $_.IPAddress + "`n" }
 [string] $ExemptShares = "NETLOGON", "SYSVOL", "ADMIN$", "C$", "IPC$", "AdminUIContentPayload", "EasySetupPayload", "SCCMContentLib$", "SMS_CPSC$", "SMS_DP$", "SMS_OCM_DATACACHE", "SMS_SITE", "SMS_SUIAgent", "SMS_WWW", "SMSPKGC$", "SMSSIG$"
 
@@ -21,26 +21,26 @@ Get-WmiObject Win32_NetworkAdapterConfiguration | ? { $_.IpAddress -ne $null } |
 foreach ($Share in Get-SmbShare) {
     $Name = $Share.Name
     if ($ExemptShares.Contains($Name)) {
-        Write-Output "`nThe $Name SMB share is exempt"
+        Write-Output "The $Name SMB share is exempt`n"
     }
     else {
         $SmbShareAccess = Get-SmbShareAccess -Name $Name
 
-        Write-Output "`n[HARDENING $Name SHARE]"
+        Write-Output "[HARDENING $Name SHARE]`n"
 
         foreach ($Entry in $SmbShareAccess) {
             Grant-SmbShareAccess -Name $Name -AccountName $($Entry.AccountName) -AccessRight Read -F | Out-Null
             
-            Write-Output "`n$($Entry.AccountName)'s $Name access right set"
+            Write-Output "$($Entry.AccountName)'s $Name access right set`n"
         }
 
-        Write-Output "`n[$Name HARDENING COMPLETE]`n"
-        Get-SmbShareAccess -Name $Name
+        Write-Output "[$Name HARDENING COMPLETE]"
+        Get-SmbShareAccess -Name $Name | Format-Table -AutoSize -Wrap
     }
 
 }
 
-Write-Output "`n[INFO] Set SMB share permissions"
+Write-Output "[INFO] Set SMB share permissions"
 
 if ($Error[0]) {
     Write-Output "`n#########################"
