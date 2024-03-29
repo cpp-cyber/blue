@@ -73,15 +73,15 @@ done`
 )
 
 var (
-	port      = flag.IntP("port", "P", 22, "SSH port to use")
-	threads   = flag.IntP("limit", "l", 3, "Thread limit per IP")
-	timelimit = flag.IntP("timeout", "T", 30, "Time limit per script")
-	targets   = flag.StringP("targets", "t", "", "List of target IP addresses (ex., 127.0.0.1-127.0.0.5,192.168.1.0/24)")
-	usernames = flag.StringP("usernames", "u", "", "List of usernames")
-	passwords = flag.StringP("passwords", "p", "", "List of passwords")
-	callbacks = flag.StringP("callbacks", "c", "", "Callback IP address(es)")
-	outfile   = flag.StringP("outfile-ext", "o", "", "Output file extension. If not specified, then no output is saved.")
-	//key       = flag.StringP("key", "k", "", "Use this SSH key to connect")
+	port         = flag.IntP("port", "P", 22, "SSH port to use")
+	threads      = flag.IntP("limit", "l", 3, "Thread limit per IP")
+	timelimit    = flag.IntP("timeout", "T", 30, "Time limit per script")
+	targets      = flag.StringP("targets", "t", "", "List of target IP addresses (ex., 127.0.0.1-127.0.0.5,192.168.1.0/24)")
+	usernames    = flag.StringP("usernames", "u", "", "List of usernames")
+	passwords    = flag.StringP("passwords", "p", "", "List of passwords")
+	callbacks    = flag.StringP("callbacks", "c", "", "Callback IP address(es)")
+	outfile      = flag.StringP("outfile-ext", "o", "", "Output file extension. If not specified, then no output is saved.")
+	key          = flag.StringP("key", "k", "", "Use this SSH key to connect")
 	environment  = flag.StringP("env", "E", "", "Set these variables before running scripts")
 	quiet        = flag.BoolP("quiet", "q", false, "Print only script output")
 	debug        = flag.BoolP("debug", "d", false, "Print debug messages")
@@ -89,6 +89,7 @@ var (
 	noValidate   = flag.BoolP("no-validate", "n", false, "Don't ensure shell is valid, or that scripts have finished running")
 	CreateConfig = flag.BoolP("create-config", "C", false, "Create a json config for auth. ONLY COMPATIBLE WITH password.sh. This has no error handling. Have fun.")
 	UseConfig    = flag.BoolP("use-config", "U", false, "Use config.json. This has no error handling. Have fun.")
+	privKey      = ""
 	callbackIPs  = []string{}
 	scripts      = []string{}
 	usernameList = []string{}
@@ -186,7 +187,7 @@ func main() {
 
 		// Split usernames
 		usernameList = strings.Split(*usernames, ",")
-		if *passwords == "" {
+		if *passwords == "" && *key == "" && !*CreateConfig {
 			fmt.Print("Password: ")
 			password, err := term.ReadPassword(int(syscall.Stdin))
 			if err != nil {
@@ -194,16 +195,14 @@ func main() {
 			}
 			passwordList = []string{strings.TrimSpace(string(password))}
 			fmt.Println()
-		} else {
+		} else if *passwords != "" {
 			passwordList = strings.Split(*passwords, ",")
+		} else if *key != "" { // Ensure key exists
+			_, err = os.ReadFile(*key)
+			if err != nil {
+				Fatal(err)
+			}
 		}
-		// Distribute IPs to runner tasks
-		var wg sync.WaitGroup
-		for _, ip := range addresses {
-			wg.Add(1)
-			go runner(ip.String(), *outfile, &wg)
-		}
-		wg.Wait()
 	} else {
 		// This handles the usage of a config.json
 		RawConfig, err := ioutil.ReadFile("config.json")
@@ -223,11 +222,20 @@ func main() {
 		var wg sync.WaitGroup
 		for _, Entry := range ReadConfigEntries {
 			wg.Add(1)
-			go GeraldRunner(Entry.IP, *outfile, &wg, Entry.Username, Entry.Password)
+			go runner_cred(Entry.IP, *outfile, &wg, Entry.Username, Entry.Password)
 		}
 		wg.Wait()
 	}
 
+	if *key != "" || len(passwordList) > 0 {
+		// Distribute IPs to runner tasks
+		var wg sync.WaitGroup
+		for _, ip := range addresses {
+			wg.Add(1)
+			go runner_bf(ip.String(), *outfile, &wg)
+		}
+		wg.Wait()
+	}
 	if len(BrokenHosts) > 0 {
 		Err(fmt.Sprintf("The following hosts had janky ssh and should be configured manually: \n"))
 		for _, host := range BrokenHosts {

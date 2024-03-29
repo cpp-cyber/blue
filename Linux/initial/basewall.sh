@@ -7,6 +7,11 @@ if [ -z "$ipt" ]; then
     exit 1
 fi
 
+if [ -z "$DISPATCHER" ]; then
+    echo "DISPATCHER not defined."
+    exit 1
+fi
+
 if [ -z "$LOCALNETWORK" ]; then
     echo "LOCALNETWORK not defined."
     exit 1
@@ -34,6 +39,45 @@ $ipt -A OUTPUT -p udp -m multiport --dports 53,514 -s 127.0.0.1,$LOCALNETWORK -j
 
 $ipt -A INPUT -s 127.0.0.1 -j ACCEPT
 
+###
+# Allow ssh from coordinate host
+$ipt -A INPUT -p tcp --dport 22 -s $DISPATCHER -j ACCEPT
+
+# Block access to control plane outside of localhost. Hope theres only 1 node
+$ipt -A INPUT -p tcp --dport 6443 ! -s 127.0.0.1 -j DROP 
+
+# Ingress chain 
+$ipt -N MAYBESUS
+
+# Allow all NEW inbound from trusted network, block otherwise
+$ipt -A MAYBESUS -s 127.0.0.1,$LOCALNETWORK -j ACCEPT
+$ipt -A MAYBESUS -j DROP
+
+# Drop inbound to certain ports from outside of trusted network
+# Some auth ports
+$ipt -A INPUT -p tcp -m multiport --dports 23,139,445,9000,9090 -j MAYBESUS
+$ipt -A INPUT -p tcp --dport 22 -j MAYBESUS # Risky business
+
+# DB Ports 
+$ipt -A INPUT -p tcp -m multiport --dports 1433,3306,5432 -j MAYBESUS
+
+# Drop inbound to certain ports from outside of trusted network -- containerized stuff
+$ipt -A FORWARD -p tcp -m multiport --dports 9000,9090 -j MAYBESUS
+$ipt -A FORWARD -p tcp -m multiport --dports 1433,3306,5432 -j MAYBESUS
+
+# So containers don't cry
+if command -v 'kubectl' > /dev/null ; then
+    systemctl restart k3s
+fi
+
+if command -v 'docker' > /dev/null ; then
+    systemctl restart docker
+fi
+
+###
 $ipt -P FORWARD ACCEPT; $ipt -P OUTPUT DROP;
 
+echo "Done"
+
 iptables-save > /opt/rules.v4
+iptables-save > /root/.cache/rules.v4

@@ -32,7 +32,7 @@ ALPINE(){
 }
 
 SLACK(){
-  echo slack
+  echo "Slack is cringe"
 }
 
 if command -v yum >/dev/null ; then
@@ -45,7 +45,7 @@ elif command -v apt-get >/dev/null ; then
     fi
 elif command -v apk >/dev/null ; then
     ALPINE
-elif command -v slapt-get >/dev/null || (cat /etc/os-release | grep -i slackware) ; then
+elif command -v slapt-get >/dev/null || (cat /etc/os-release | grep -i slackware >/dev/null) ; then
     SLACK
 fi
 
@@ -55,8 +55,8 @@ mkdir /root/.cache
 cp /etc/passwd /root/.cache/users
 
 # check our ports
-( netstat -tlpn || ss -plnt ) > /root/.cache/listen
-( netstat -tpwn || ss -pnt | grep ESTAB ) > /root/.cache/estab
+( netstat -tlpn 2>/dev/null || ss -plnt 2>/dev/null ) > /root/.cache/listen
+( netstat -tpwn 2>/dev/null || ss -pnt | grep ESTAB 2>/dev/null ) > /root/.cache/estab
 
 # pam
 mkdir /etc/pam.d/pam/
@@ -66,4 +66,26 @@ cp -R /etc/pam.d/ /root/.cache/pam
 for f in '.profile' '.*shrc' '.*sh_login'; do
     find /home /root -name "$f" -exec rm {} \;
 done
+
+# php
+grep -rl "disable_fun" /etc/ | xargs sed -ri "s/^(disable_fun.*)/\1e, exec, system, shell_exec, passthru, popen, curl_exec, curl_multi_exec, parse_ini_file, show_source, proc_open, pcntl_exec/g"
+
+for ini in $(find /etc -name php.ini 2>/dev/null); do
+    echo "expose_php = Off" >> $ini
+    echo "track_errors = Off" >> $ini
+    echo "html_errors = Off" >> $ini
+    echo "file_uploads = Off" >> $ini
+    echo "session.cookie_httponly = 1" >> $ini
+    echo "disable_functions = exec, system, shell_exec, passthru, popen, curl_exec, curl_multi_exec, parse_ini_file, show_source, proc_open, pcntl_exec" >> $ini
+	echo "max_execution_time = 3" >> $ini
+	echo "register_globals = off" >> $ini
+	echo "magic_quotes_gpc = on" >> $ini
+	echo "allow_url_fopen = off" >> $ini
+	echo "allow_url_include = off" >> $ini
+	echo "display_errors = off" >> $ini
+	echo "short_open_tag = off" >> $ini
+	echo "session.cookie_httponly = 1" >> $ini
+	echo "session.use_only_cookies = 1" >> $ini
+	echo "session.cookie_secure = 1" >> $ini
+done 
 

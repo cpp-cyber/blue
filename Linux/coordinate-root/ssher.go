@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -9,23 +11,30 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/bramvdbogaerde/go-scp"
 	"github.com/melbahja/goph"
 )
 
 var ExitString string
 
-func isPortOpen(host string, port int) bool {
+func isValidPort(host string, port int) bool {
 	address := fmt.Sprintf("%s:%d", host, port)
 
-	conn, err := net.DialTimeout("tcp", address, 500*time.Millisecond)
+	conn, err := net.DialTimeout("tcp", address, 5000*time.Millisecond)
 	if err != nil {
 		return false
 	}
 	defer conn.Close()
+	banner, err := bufio.NewReader(conn).ReadString('\n')
+	regex := regexp.MustCompile(`(?i)windows|winssh`)
+	if regex.MatchString(banner) {
+		return false
+	}
 
 	return true
 }
@@ -66,7 +75,7 @@ func ssherWrapper(i instance, client *goph.Client) {
 	wg.Wait()
 }
 
-func runner(ip string, outfile string, w *sync.WaitGroup) {
+func runner_bf(ip string, outfile string, w *sync.WaitGroup) {
 	defer w.Done()
 	var err error
 	var client *goph.Client
@@ -75,40 +84,56 @@ func runner(ip string, outfile string, w *sync.WaitGroup) {
 		IP:      ip,
 		Outfile: outfile,
 	}
-
-	if isPortOpen(i.IP, *port) {
+	if isValidPort(i.IP, *port) {
 		for _, u := range usernameList {
+			i.Username = u
 			if found {
 				break
 			}
-			for _, p := range passwordList {
-				i.Username = u
-				i.Password = p
-				if *debug && *passwords != "" {
-					InfoExtra(i, "Trying password '"+i.Password+"'")
-				}
-				client, err = goph.NewUnknown(i.Username, i.IP, goph.Password(i.Password))
-				if err != nil {
-					AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Error while connecting to %s: %s", i.IP, err))
-				} else {
-					InfoExtra(i, "Valid credentials for", i.Username)
-					found = true
-					i.Username = u
+			if len(passwordList) > 0 {
+				for _, p := range passwordList {
 					i.Password = p
+					if p == "" {
+						continue
+					}
+					DebugExtra(i, "Trying password '"+i.Password+"'")
+					client, err = goph.NewUnknown(i.Username, i.IP, goph.Password(i.Password))
+					if err != nil {
+						AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Error while connecting to %s: %s", i.IP, err))
+					} else {
+						InfoExtra(i, "Valid credentials for", i.Username)
+						found = true
+						i.Username = u
+						i.Password = p
+						defer client.Close()
+						ssherWrapper(i, client)
+						break
+					}
+				}
+			} else {
+				DebugExtra(i, "Using key auth")
+				privKey, err := goph.Key(*key, "")
+				if err != nil {
+					ErrExtra(i, err)
+				}
+				client, err = goph.NewUnknown(i.Username, i.IP, privKey)
+				if err != nil {
+					ErrExtra(i, err)
+				} else {
+					InfoExtra(i, "Valid key for", i.Username)
+					found = true
 					defer client.Close()
 					ssherWrapper(i, client)
-					break
 				}
+
 			}
 		}
 	}
 }
 
 // Second runner, utilize user/pass combo
-// Nothing like more janky by redefining the runner for individual cred sets
-func GeraldRunner(ip string, outfile string, w *sync.WaitGroup, username string, password string) {
+func runner_cred(ip string, outfile string, w *sync.WaitGroup, username string, password string) {
 	defer w.Done()
-
 	found := false
 	deadHost := false
 	i := instance{
@@ -117,12 +142,8 @@ func GeraldRunner(ip string, outfile string, w *sync.WaitGroup, username string,
 		Username: username,
 		Password: password,
 	}
-	DebugExtra(i, "Starting!")
-
-	if isPortOpen(i.IP, *port) {
-		DebugExtra(i, "Port is open, logging in!")
+	if isValidPort(i.IP, *port) {
 		client, err := goph.NewUnknown(i.Username, i.IP, goph.Password(i.Password))
-		DebugExtra(i, "SSH has been dialed")
 		if err != nil {
 			AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Error while connecting to %s: %s", i.IP, err))
 		}
@@ -134,11 +155,38 @@ func GeraldRunner(ip string, outfile string, w *sync.WaitGroup, username string,
 		}
 	}
 
-	if !found {
-		if !deadHost {
-			AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Login attempt failed to: %s", i.IP))
+	if !found && !deadHost {
+		AnnoyingErrs = append(AnnoyingErrs, fmt.Sprintf("Login attempt failed to: %s", i.IP))
+	}
+}
+
+func Upload(client *goph.Client, remotePath string, localPath string) error {
+	scp_client, err := scp.NewClientBySSH(client.Client)
+	if err != nil {
+		return err
+	}
+
+	f, _ := os.Open(localPath)
+	defer f.Close()
+
+	err = scp_client.CopyFromFile(context.Background(), *f, remotePath, "0777")
+	if err != nil {
+		return err
+	}
+
+	output, err := client.Run("ls " + remotePath)
+	if err != nil {
+		return err
+	}
+	if strings.Contains(string(output), "No such file or directory") {
+		script, _ := os.ReadFile(localPath)
+		uploadScriptCmd := "echo \"" + base64.StdEncoding.EncodeToString(script) + "\" | base64 -d > " + remotePath
+		output, err = client.Run(uploadScriptCmd)
+		if err != nil {
+			return err
 		}
 	}
+	return nil
 }
 func ssher(i instance, client *goph.Client, script string, wg *sync.WaitGroup) {
 
@@ -172,14 +220,18 @@ func ssher(i instance, client *goph.Client, script string, wg *sync.WaitGroup) {
 		i.Outfile = i.IP + "." + i.Outfile
 	}
 
-	// Write a temporary file, upload it, execute it, and clean
+	// Write a temporary file, upload it
 	os.WriteFile(filename, []byte(script), 0644)
-	client.Upload(filename, filename)
-
+	err = Upload(client, filename, filename)
+	if err != nil {
+		ErrExtra(i, err)
+		os.Remove(filename)
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	output, err = client.RunContext(ctx, fmt.Sprintf("chmod 777 %s ; %s ; rm %s", filename, filename, filename))
+	output, err = client.RunContext(ctx, fmt.Sprintf("%s ; rm %s", filename, filename))
 	stroutput = string(output)
 
 	if err != nil {
