@@ -27,7 +27,7 @@ Sub HEADERFOOTERCOLOR()
 	oStyle.LeftMargin = 0
 	oStyle.RightMargin = 0
 	oStyle.FillBackground = True
-	oStyle.HeaderBackColor = RGB(16, 55, 93)
+	oStyle.HeaderBackColor = RGB(147, 44, 18)
 	oStyle.HeaderHeight = 5000
 	oStyle.FooterBackColor = RGB(217,217,217)
 	oStyle.FooterHeight = 3000
