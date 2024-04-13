@@ -29,7 +29,7 @@ reg add "HKLM\System\CurrentControlSet\Services\LanmanServer\Parameters" /v Enab
 Write-Output "$Env:ComputerName SMB settings applied`n"
 
 # Define a list of shares that should be exempt from hardening
-[string] $ExemptShares = "NETLOGON", "SYSVOL", "ADMIN$", "C$", "IPC$", "AdminUIContentPayload", "EasySetupPayload", "SCCMContentLib$", "SMS_CPSC$", "SMS_DP$", "SMS_OCM_DATACACHE", "SMS_SITE", "SMS_SUIAgent", "SMS_WWW", "SMSPKGC$", "SMSSIG$"
+[string[]] $ExemptShares = "NETLOGON", "SYSVOL", "ADMIN$", "C$", "IPC$", "AdminUIContentPayload", "EasySetupPayload", "SCCMContentLib$", "SMS_CPSC$", "SMS_DP$", "SMS_OCM_DATACACHE", "SMS_SITE", "SMS_SUIAgent", "SMS_WWW", "SMSPKGC$", "SMSSIG$"
 
 # Get each share, compare against list of exempt shares, and if no match set read-only
 foreach ($Share in Get-SmbShare) {
