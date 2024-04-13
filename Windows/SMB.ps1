@@ -26,7 +26,34 @@ reg add "HKLM\System\CurrentControlSet\Services\LanmanServer\Parameters" /v Enab
 #reg add "HKLM\System\CurrentControlSet\Services\LanmanServer\Parameters" /v AutoShareWks /t REG_DWORD /d 0 /f | Out-Null
 #net share C$ /delete | Out-Null
 #net share ADMIN$ /delete | Out-Null
-Write-Output "$Env:ComputerName SMB shares deleted and settings applied"
+Write-Output "$Env:ComputerName SMB settings applied`n"
+
+# Define a list of shares that should be exempt from hardening
+[string] $ExemptShares = "NETLOGON", "SYSVOL", "ADMIN$", "C$", "IPC$", "AdminUIContentPayload", "EasySetupPayload", "SCCMContentLib$", "SMS_CPSC$", "SMS_DP$", "SMS_OCM_DATACACHE", "SMS_SITE", "SMS_SUIAgent", "SMS_WWW", "SMSPKGC$", "SMSSIG$"
+
+# Get each share, compare against list of exempt shares, and if no match set read-only
+foreach ($Share in Get-SmbShare) {
+    $Name = $Share.Name
+    if ($ExemptShares.Contains($Name)) {
+        Write-Output "The $Name SMB share is exempt`n"
+    }
+    else {
+        $SmbShareAccess = Get-SmbShareAccess -Name $Name
+
+        Write-Output "[HARDENING $Name SHARE]`n"
+
+        foreach ($Entry in $SmbShareAccess) {
+            Grant-SmbShareAccess -Name $Name -AccountName $($Entry.AccountName) -AccessRight Read -F | Out-Null
+            
+            Write-Output "$($Entry.AccountName)'s $Name access right set`n"
+        }
+
+        Write-Output "[$Name HARDENING COMPLETE]"
+        Get-SmbShareAccess -Name $Name | Format-Table -AutoSize -Wrap
+    }
+}
+
+Write-Output "[INFO] Set SMB share permissions"
 
 if ($Error[0]) {
     Write-Output "`n#########################"
