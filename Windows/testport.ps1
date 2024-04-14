@@ -15,19 +15,18 @@ function Test-Port {
     {
         # Close the connection and report timeout
         $tcpclient.Close()
-        if($verbose){Write-Host "[WARN] $($IP):$Port Connection Timeout " -ForegroundColor Yellow}
-        return @{$Ip = $false}
+        if ($verbose) { Write-Host "[WARN] $($IP):$Port Connection Timeout " -ForegroundColor Yellow }
+        return @{ $Ip = $false }
     }
     else {
         # Close the connection and report the error if there is one
         $error.Clear()
         $tcpclient.EndConnect($iar) | out-Null
         if (!$?) {
-            if ($verbose) {
-                write-host $error[0] -ForegroundColor Red};
-                return @{$Ip = $false}
+            if ($verbose) { Write-Host $error[0] -ForegroundColor Red };
+            return @{ $Ip = $false }
         }
         $tcpclient.Close()
     }
-    return @{$Ip = $true}
+    return @{ $Ip = $true }
 }
