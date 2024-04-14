@@ -39,42 +39,6 @@ function Get-Password {
     return $p + "1!"
 }
 
-function Test-Port {
-    Param(
-        [string]$Ip,
-        [int]$Port,
-        [int]$Timeout = 3000,
-        [switch]$Verbose
-    )
-
-    $ErrorActionPreference = "SilentlyContinue"
-
-    $tcpclient = New-Object System.Net.Sockets.TcpClient
-    $iar = $tcpclient.BeginConnect($ip,$port,$null,$null)
-    $wait = $iar.AsyncWaitHandle.WaitOne($timeout,$false)
-    if (!$wait)
-    {
-        # Close the connection and report timeout
-        $tcpclient.Close()
-        if($verbose){Write-Host "[WARN] $($IP):$Port Connection Timeout " -ForegroundColor Yellow}
-        return $false
-    } 
-    else {
-        # Close the connection and report the error if there is one
-        $error.Clear()
-        $tcpclient.EndConnect($iar) | out-Null
-        if(!$?){if($verbose){write-host $error[0] -ForegroundColor Red};$failed = $true}
-        $tcpclient.Close()
-    }
-
-    if ($failed) {
-        return $false
-    }
-    else {
-        return $true
-    }
-}
-
 if ($Connect) {
 
     if (!$Repair) {
@@ -109,9 +73,21 @@ if ($Connect) {
                 Write-Host "[ERROR] Failed to get computers from file" -ForegroundColor Red
                 exit
             }
+
+            $workingDir = $PWD | Select-Object -ExpandProperty Path
+
+            foreach ($Computer in $Computers) {
+                Start-Job -ScriptBlock {cd $Using:workingDir; Import-Module .\testport.ps1; Test-Port -Ip $Using:Computer -Port 5985}
+            }
+            $5985Table = Receive-Job * -Wait
+
+            foreach ($Computer in $Computers) {
+                Start-Job -ScriptBlock {cd $Using:workingDir; Import-Module .\testport.ps1; Test-Port -Ip $Using:Computer -Port 5986}
+            }
+            $5986Table = Receive-Job * -Wait
     
             foreach ($Computer in $Computers) {
-                if (Test-Port -Ip $Computer -Port 5985 -Timeout $Timeout -Verbose) {
+                if ($5985Table.$Computer) {
                     $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred
                     if ($TestSession) {
                         $global:Sessions += $TestSession
@@ -122,7 +98,7 @@ if ($Connect) {
                         Write-Host "[ERROR] WinRM 5985 Failed: $Computer" -ForegroundColor Red
                     }
                 }
-                elseif (Test-Port -Ip $Computer -Port 5986 -Timeout $Timeout -Verbose) {
+                elseif ($5986Table.$Computer) {
                     $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred -UseSSL -SessionOption @{SkipCACheck=$true;SkipCNCheck=$true;SkipRevocationCheck=$true}
                     if ($TestSession) {
                         $global:Sessions += $TestSession
@@ -168,8 +144,21 @@ if ($Connect) {
             foreach ($Computer in $Computers) {
                 Write-Host "$Computer"
             }
+
+            $workingDir = $PWD | Select-Object -ExpandProperty Path
+
             foreach ($Computer in $Computers) {
-                if (Test-Port -Ip $Computer -Port 5985 -Timeout $Timeout -Verbose) {
+                Start-Job -ScriptBlock {cd $Using:workingDir; Import-Module .\testport.ps1; Test-Port -Ip $Using:Computer -Port 5985}
+            }
+            $5985Table = Receive-Job * -Wait
+
+            foreach ($Computer in $Computers) {
+                Start-Job -ScriptBlock {cd $Using:workingDir; Import-Module .\testport.ps1; Test-Port -Ip $Using:Computer -Port 5986}
+            }
+            $5986Table = Receive-Job * -Wait
+
+            foreach ($Computer in $Computers) {
+                if ($5985Table.$Computer) {
                     $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred
                     if ($TestSession) {
                         $global:Sessions += $TestSession
@@ -180,7 +169,7 @@ if ($Connect) {
                         Write-Host "[ERROR] WinRM 5985 Failed: $Computer" -ForegroundColor Red
                     }
                 }
-                elseif (Test-Port -Ip $Computer -Port 5986 -Timeout $Timeout -Verbose) {
+                elseif ($5986Table.$Computer) {
                     $TestSession = New-PSSession -ComputerName $Computer -Credential $global:Cred -UseSSL -SessionOption @{SkipCACheck=$true;SkipCNCheck=$true;SkipRevocationCheck=$true}
                     if ($TestSession) {
                         $global:Sessions += $TestSession
