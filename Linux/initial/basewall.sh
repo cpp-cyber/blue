@@ -2,6 +2,17 @@
 # @d_tranman/Nigel Gerald/Nigerald
 ipt=$(command -v iptables || command -v /sbin/iptables || command -v /usr/sbin/iptables)
 
+ALLOW() {
+    $ipt -P INPUT ACCEPT; $ipt -P OUTPUT ACCEPT ; $ipt -P FORWARD ACCEPT ; $ipt -F; $ipt -X
+}
+CHECKERR() {
+    if [ ! $? -eq 0 ]; then
+        echo "ERROR, EXITTING TO PREVENT LOCKOUT"
+        ALLOW
+        exit 1
+    fi
+}
+
 if [ -z "$ipt" ]; then
     echo "NO IPTABLES ON THIS SYSTEM, GOOD LUCK"
     exit 1
@@ -22,26 +33,32 @@ if [ -z "$CCSHOST" ] && [ -z "$NOTNATS" ]; then
     exit 1
 fi
 
-$ipt -P OUTPUT ACCEPT ; $ipt -P FORWARD ACCEPT ; $ipt -F; $ipt -X ;$ipt -P INPUT ACCEPT 
+ALLOW
 
 $ipt -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 $ipt -A OUTPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
 if [ -n "$CCSHOST" ]; then
     $ipt -A OUTPUT -d $CCSHOST -j ACCEPT
+    CHECKERR
     $ipt -A INPUT -s $CCSHOST -j ACCEPT
+    CHECKERR
 fi
 
-$ipt -A OUTPUT -d 127.0.0.1,$LOCALNETWORK -m conntrack --ctstate NEW -j ACCEPT
+$ipt -A OUTPUT -d 127.0.0.1,$LOCALNETWORK -m conntrack --ctstate NEW -j ACCEPT 
+CHECKERR
 
 $ipt -A INPUT -p udp -m multiport --dports 53,514 -s 127.0.0.1,$LOCALNETWORK -j ACCEPT
+CHECKERR
 $ipt -A OUTPUT -p udp -m multiport --dports 53,514 -s 127.0.0.1,$LOCALNETWORK -j ACCEPT
+CHECKERR
 
 $ipt -A INPUT -s 127.0.0.1 -j ACCEPT
 
 ###
 # Allow ssh from coordinate host
 $ipt -A INPUT -p tcp --dport 22 -s $DISPATCHER -j ACCEPT
+CHECKERR
 
 # Block access to control plane outside of localhost. Hope theres only 1 node
 $ipt -A INPUT -p tcp --dport 6443 ! -s 127.0.0.1 -j DROP 
@@ -51,6 +68,7 @@ $ipt -N MAYBESUS
 
 # Allow all NEW inbound from trusted network, block otherwise
 $ipt -A MAYBESUS -s 127.0.0.1,$LOCALNETWORK -j ACCEPT
+CHECKERR
 $ipt -A MAYBESUS -j DROP
 
 # Drop inbound to certain ports from outside of trusted network

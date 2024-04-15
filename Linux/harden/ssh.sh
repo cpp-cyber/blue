@@ -1,11 +1,21 @@
 #!/bin/sh
 # @d_tranman/Nigel Gerald/Nigerald
 sys=$(command -v service || command -v systemctl)
+FILE=/etc/ssh/sshd_config
+RC=/etc/rc.d/rc.sshd
 
-sed -i -E 's/(#PubkeyAuthentication yes|PubkeyAuthentication yes)/PubkeyAuthentication no/g' /etc/ssh/sshd_config
+if [ -f $FILE ]; then
+    sed -i 's/^AllowTcpForwarding/# AllowTcpForwarding/' $FILE; echo 'AllowTcpForwarding no' >> $FILE
+    sed -i 's/^X11Forwarding/# X11Forwarding/' $FILE; echo 'X11Forwarding no' >> $FILE
+else
+    echo "Could not find sshd config"
+fi
 
 if [[ -z $sys ]]; then
-  RC="/etc/rc.d/sshd"
+  if [ -f "/etc/rc.d/sshd" ]; then
+    RC="/etc/rc.d/sshd"
+  else
+    RC="/etc/rc.d/rc.sshd"
   $RC restart
 else
   $sys restart ssh || $sys ssh restart || $sys restart sshd || $sys sshd restart 
