@@ -1,0 +1,115 @@
+{{ define "body" }}
+<div class="container-fluid">
+
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Injects</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <h2>New Inject</h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" class="form-control" id="name" placeholder="Name">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-group">
+                <label for="category">Category</label>
+                <input type="text" class="form-control" id="category" placeholder="Category">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-group">
+                <label for="pad">Pad</label>
+                <input type="text" class="form-control" id="pad" placeholder="Pad">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-group">
+                <label for="id">ID</label>
+                <input type="text" class="form-control" id="id" placeholder="ID">
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <button type="button" class="btn btn-primary" onclick="NewInject()">Create</button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div id="injects" class="h-100 d-flex align-items-center justify-content-center row">
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        GetInjects();
+    });
+
+    function GetInjects() {
+        $.ajax({
+            url: "/api/v1/injects",
+            type: "GET",
+            dataType: "json",
+            success: function (data) {
+                for (var i = 0; i < data.length; i++) {
+                    if (document.getElementById(data[i][3]) === null) {
+                        AddAgentCard(data[i][0], data[i][1], data[i][2], data[i][3]);
+                    }
+                }
+            },
+            error: function (xhr, status, error) {
+                console.log("Error: " + error);
+            },
+        });
+    }
+
+    function NewInject() {
+        var name = $("#name").val();
+        var category = $("#category").val();
+        var pad = $("#pad").val();
+        var id = $("#id").val();
+        $.ajax({
+            url: "/api/v1/injects",
+            type: "POST",
+            data: JSON.stringify({
+                "name": name,
+                "category": category,
+                "pad": pad,
+                "id": id
+            }),
+            contentType: "application/json",
+            success: function (data) {
+                AddAgentCard(name, category, pad, id);
+            },
+            error: function (xhr, status, error) {
+                console.log("Error: " + error);
+            },
+        });
+    }
+
+    function AddAgentCard(name, category, pad, id) {
+        var card = '<div class="col-md-4" style="max-width: 18rem;">' +
+            '<div id="' + id + '" class="card text-bg-danger mb-3 col" style="max-width: 18rem;">' +
+            '<div class="card-header">' + category + '</div>' +
+            '<div class="card-body">' +
+            '<h5 class="card-title">' + name + '</h5>' +
+            '<p class="card-text">' + pad + '</p>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+        $("#injects").append(card);
+    }
+</script>
+{{ end }}
