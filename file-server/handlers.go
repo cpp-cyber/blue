@@ -86,18 +86,30 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func getInjects(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprintf(w, "Hello, World!")
+    injects, err := GetAllInjects()
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    fmt.Fprintf(w, "%v\n", injects)
 }
 
 func createInject(w http.ResponseWriter, r *http.Request) {
-    r.ParseForm()
+    err := r.ParseForm()
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
 
-    name := r.FormValue("name")
-    category := r.FormValue("category")
-    pad := r.FormValue("pad")
-    id := r.FormValue("id")
+    fmt.Println(r.Body)
+    fmt.Println(r.PostForm)
+    name := r.Form.Get("name")
+    fmt.Println(name)
+    category := r.Form.Get("category")
+    pad := r.Form.Get("pad")
 
-    err := AddInjectToDB(name, category, pad, id)
+    err = AddInject(name, category, pad)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return

@@ -31,11 +31,6 @@
                     </div>
                 </li>
                 <li class="features-item">
-                    <div class="form-group">
-                        <input type="text" class="form-control" id="id" placeholder="ID">
-                    </div>
-                </li>
-                <li class="features-item">
                     <button type="button" class="btn btn-primary" onclick="NewInject()">Create</button>
                 </li>
             </ul>
@@ -102,11 +97,11 @@
                 "name": name,
                 "category": category,
                 "pad": pad,
-                "id": id
             }),
-            contentType: "application/json",
+            contentType: "application/x-www-form-urlencoded",
             success: function (data) {
-                AddAgentCard(name, category, pad, id);
+                console.log(data);
+                GetInjects();
             },
             error: function (xhr, status, error) {
                 console.log("Error: " + error);
