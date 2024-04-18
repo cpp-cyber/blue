@@ -1,58 +1,73 @@
 {{ define "body" }}
+<head>
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
 <div class="container-fluid">
+    <div class="col-md-3">
+        <div class="side-bar">
+            <div class="logo-name-wrapper">
+                <div class="logo-name">
+                    <span class="h1 logo-name__name">Injects Form</span>
+                </div>
+                <button class="logo-name__button">
+                    <img src="/assets/menu.png" class="logo-name__icon" id="logo-name__icon"></i>
+                </button>
+            </div>
 
-    <div class="row">
-        <div class="col-md-12">
-            <h1>Injects</h1>
+            <ul class="features-list">
+                <li class="features-item">
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="name" placeholder="Name">
+                    </div>
+                </li>
+                <li class="features-item">
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="category" placeholder="Category">
+                    </div>
+                </li>
+                <li class="features-item">
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="pad" placeholder="Pad">
+                    </div>
+                </li>
+                <li class="features-item">
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="id" placeholder="ID">
+                    </div>
+                </li>
+                <li class="features-item">
+                    <button type="button" class="btn btn-primary" onclick="NewInject()">Create</button>
+                </li>
+            </ul>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-md-12">
-            <h2>New Inject</h2>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-4">
-            <div class="form-group">
-                <label for="name">Name</label>
-                <input type="text" class="form-control" id="name" placeholder="Name">
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="form-group">
-                <label for="category">Category</label>
-                <input type="text" class="form-control" id="category" placeholder="Category">
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="form-group">
-                <label for="pad">Pad</label>
-                <input type="text" class="form-control" id="pad" placeholder="Pad">
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="form-group">
-                <label for="id">ID</label>
-                <input type="text" class="form-control" id="id" placeholder="ID">
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-12">
-            <button type="button" class="btn btn-primary" onclick="NewInject()">Create</button>
-        </div>
-    </div>
-
-    <div class="row">
-        <div id="injects" class="h-100 d-flex align-items-center justify-content-center row">
-        </div>
+    <div class="col-md-9">
+        <!-- Content here -->
     </div>
 </div>
+</div>
+<script type="text/javascript">
+    {
+        let arrowButton = document.querySelector('.logo-name__button');
+        let sideBar = document.querySelector('.side-bar');
+        let arrowIcon = document.querySelector('#logo-name__icon');
+        let featuresList = document.querySelector('.features-list');
 
-<script>
+        arrowButton.onclick = function() {
+            sideBar.classList.toggle('collapse');
+
+            if (sideBar.classList.contains('collapse')) {
+                featuresList.style.display = 'none';
+                arrowIcon.src = '/assets/menu.png';
+            } else {
+                setTimeout(() => {
+                    featuresList.style.display = 'block';
+                }, 500);
+                arrowIcon.src = '/assets/menu.png';
+            }
+        };
+    }
     $(document).ready(function () {
         GetInjects();
     });
