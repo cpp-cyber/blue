@@ -1,6 +1,7 @@
 package main
 
 import (
+    "os"
     "net/http"
     "flag"
 )
@@ -10,6 +11,7 @@ var dir string
 func init() {
     flag.StringVar(&dir, "dir", "./uploads", "the directory to serve files from. Defaults to the current dir")
     flag.Parse()
+    os.MkdirAll(dir, os.ModePerm)
 }
 
 func setupRoutes() {

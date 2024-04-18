@@ -30,26 +30,28 @@
     </nav>
 
     <body>
-        <div class="container">
-            <h1>Files</h1>
-            <ul class="list-group">
-                {{if ne .Path ""}}
-                <li class="list-group-item">
-                    <a href="/files/{{.Path | urlquery}}/../">🏠</a>
-                </li>
-                {{end}}
-                {{range .Files}}
-                <li class="list-group-item">
-                    <a href="{{if .IsDir }}/files/{{ else }}/download/{{end}}{{$.Path | urlquery}}/{{.Name | urlquery}}{{if .IsDir}}/{{end}}">
-                        {{.Name}}{{if .IsDir}}/(Directory){{end}}
-                    </a>
+        <div class="h-100 d-flex alight-items-center justify-content-center">
+            <div>
+                <h1>Files</h1>
+                <ul class="list-group">
+                    {{if ne .Path ""}}
+                    <li class="list-group-item">
+                        <a href="/files/{{.Path | urlquery}}/../">🏠</a>
+                    </li>
                     {{end}}
-                </li>
-                <li class="list-group-item">
-                    <input type="text" id="path" name="path">
-                    <input type="submit" value="Create Directory" onclick="createDir()">
-                </li>
-            </ul>
+                    {{range .Files}}
+                    <li class="list-group-item">
+                        <a class="" href="{{if .IsDir }}/files/{{ else }}/download/{{end}}{{$.Path | urlquery}}/{{.Name | urlquery}}{{if .IsDir}}/{{end}}">
+                            {{.Name}}{{if .IsDir}}/(Directory){{end}}
+                        </a>
+                        {{end}}
+                    </li>
+                    <li class="list-group-item">
+                        <input type="text" id="path" name="path">
+                        <input type="submit" value="Create Directory" onclick="createDir()">
+                    </li>
+                </ul>
+            </div>
         </div>
     </body>
 
@@ -68,6 +70,7 @@
                 contentType: "application/json",
                 success: function(data) {
                     console.log(path); 
+                    window.location.reload();
                 }
             });
         }

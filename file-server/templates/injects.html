@@ -164,23 +164,25 @@
             statusBG = "bg-danger";
         } else if (dueHour - currHour <= 0 && status != "done") {
             statusBG = "bg-danger";
-        } else if (dueHour - currHour == 1 && dueMin - currMin > 0 && status != "done") {
+        } else if (dueHour - currHour == 1 && dueMin - currMin >= 0 && status != "done") {
             statusBG = "bg-warning";
         } else if (dueHour - currHour >= 2 && status != "done") {
-            statusBG = "bg-info";
+            statusBG = "bg-dark";
         } else {
             statusBG = "bg-success";
         }
 
         var card = '<div class="col" ;">' +
-            '<div id="' + id + '" class="card ' + statusBG + ' mb-3 col" style="width: 20rem">' +
+            '<div id="' + id + '" class="card ' + statusBG + ' mb-3 col" style="width: 40rem">' +
             '<div class="card-header" style="font-size: 3rem">' + id + ' - ' + name +'</div>' +
             '<div class="card-body">' +
-            '<h5 class="card-title" style="font-size: 2rem"><a href="https://' + pad + '" target="_blank">' + pad + '</a></h5>' +
+            '<h5 class="card-title" style="font-size: 2rem"><a href="' + pad + '" target="_blank">' + pad + '</a></h5>' +
             '<p class="card-text" style="font-size: 2rem">' + "Due at " + time + '</p>' +
+            '<div class="btn-group" role="group" aria-label="Basic example">' +
             '<button type="button" class="btn btn-primary" onclick="editInject('+id+', 1)">Done</button>' +
             '<button type="button" class="btn btn-primary" onclick="editInject('+id+', 0)">NOT DONE!</button>' +
             '<button type="button" class="btn btn-primary" onclick="deleteInject('+id+')">Delete</button>' +
+            '</div>' +
             '</div>' +
             '</div>' +
             '</div>';

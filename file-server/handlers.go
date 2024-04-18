@@ -68,13 +68,19 @@ func serveTemplate(w http.ResponseWriter, r *http.Request) {
 
 func uploadFile(w http.ResponseWriter, r *http.Request) {
     r.ParseMultipartForm(10 << 20)
-    file, handler, err := r.FormFile("myFile")
+    file, handler, err := r.FormFile("file")
     if err != nil {
         fmt.Println("Error retrieving the file")
         fmt.Println(err)
         return
     }
     defer file.Close()
+
+    if handler.Size > 10 << 20 {
+        http.Error(w, "File too large", http.StatusInternalServerError)
+        return
+    }
+
     fmt.Printf("Uploaded File: %+v\n", handler.Filename)
     fmt.Printf("File Size: %+v\n", handler.Size)
     fmt.Printf("MIME Header: %+v\n", handler.Header)
