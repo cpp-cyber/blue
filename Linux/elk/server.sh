@@ -3,36 +3,84 @@
 if [ -z "$1" ]; then
     echo "Missing DL IP"
     exit 1
-elif [ -z "$2" ]; then
+fi
+
+if [ -z "$2" ]; then
     echo "Missing Allowed IP"
     exit 1
 fi
+DL=$1
+
+RHEL(){
+    IS_RHEL=true
+    ES="http://$DL/elasticsearch-8.13.2-x86_64.rpm"
+    KB="http://$DL/kibana-8.13.2-x86_64.rpm"
+    FB="http://$DL/filebeat-8.13.2-x86_64.rpm"
+    curl -L -s -O $ES
+    if [ $? -ne 0 ]; then
+        echo "Failed to download elasticsearch"
+        exit 1
+    fi
+    curl -L -s -O $KB
+    if [ $? -ne 0 ]; then
+        echo "Failed to download kibana"
+        exit 1
+    fi
+    curl -L -s -O $FB
+    if [ $? -ne 0 ]; then
+        echo "Failed to download filebeat"
+        exit 1
+    fi
+
+    rpm -i elasticsearch-8.13.2-x86_64.rpm 
+    rpm -i kibana-8.13.2-x86_64.rpm 
+    rpm -i filebeat-8.13.2-x86_64.rpm
+    systemctl stop firewalld
+}
+
+DEBIAN(){
+    # Todo: Add better checks for the files
+    wget http://$DL/elasticsearch-8.13.2-amd64.deb
+    if [ $? -ne 0 ]; then
+        echo "Failed to download elasticsearch"
+        exit 1
+    fi
+    wget http://$DL/kibana-8.13.2-amd64.deb
+    if [ $? -ne 0 ]; then
+        echo "Failed to download kibana"
+        exit 1
+    fi
+    wget http://$DL/filebeat-8.13.2-amd64.deb
+    if [ $? -ne 0 ]; then
+        echo "Failed to download filebeat"
+        exit 1
+    fi
+    dpkg -i elasticsearch-8.13.2-amd64.deb kibana-8.13.2-amd64.deb filebeat-8.13.2-amd64.deb
+}
+
+UBUNTU(){
+    DEBIAN
+}
+
+if command -v yum >/dev/null ; then
+    RHEL
+elif command -v apt-get >/dev/null ; then
+    if $(cat /etc/os-release | grep -qi Ubuntu); then
+        UBUNTU
+    else
+        DEBIAN
+    fi
+fi
+
 
 TMP=$(mktemp)
-# Todo: Add better checks for the files
-wget http://$1/elasticsearch-8.13.2-amd64.deb
-if [ $? -ne 0 ]; then
-    echo "Failed to download elasticsearch"
-    exit 1
-fi
-wget http://$1/kibana-8.13.2-amd64.deb
-if [ $? -ne 0 ]; then
-    echo "Failed to download kibana"
-    exit 1
-fi
-wget http://$1/filebeat-8.13.2-amd64.deb
-if [ $? -ne 0 ]; then
-    echo "Failed to download filebeat"
-    exit 1
-fi
 
-sudo dpkg -i elasticsearch-8.13.2-amd64.deb kibana-8.13.2-amd64.deb filebeat-8.13.2-amd64.deb
 
-sudo systemctl daemon-reload
-sudo systemctl enable elasticsearch
-sudo systemctl enable kibana
+systemctl daemon-reload
+systemctl enable elasticsearch
+systemctl enable kibana
 
-sudo systemctl start elasticsearch
+systemctl start elasticsearch
 
 iptables -A INPUT -p tcp -s $2 --dport 5601 -j ACCEPT
 iptables -A INPUT -p tcp --dport 5601 -j DROP
@@ -46,7 +94,11 @@ systemctl restart kibana
 
 # Testing stuff with filebeat
 export CA=$(openssl x509 -fingerprint -sha256 -noout -in /etc/elasticsearch/certs/http_ca.crt | awk --field-separator="=" '{print $2}' | sed 's/://g')
-PASS=$(yes | /usr/share/elasticsearch/bin/elasticsearch-reset-password -s -u 'elastic'| awk -F '[y/N]' '{print $1}')
+if [ -z "$IS_RHEL" ]; then
+    PASS=$(yes | /usr/share/elasticsearch/bin/elasticsearch-reset-password -s -u 'elastic')
+else
+    PASS=$(yes | /usr/share/elasticsearch/bin/elasticsearch-reset-password -s -u 'elastic'| awk -F '[y/N]' '{print $1}')
+fi
 echo $PASS
 sed -e 's/hosts: \["localhost:9200"\]/hosts: \["https:\/\/localhost:9200"\]/g; /hosts: \["https:\/\/localhost:9200"\]/a \ \n  username: "elastic"\n  password: "'"$PASS"'"\n  ssl:\n    enabled: true\n    ca_trusted_fingerprint: "'"$CA"'"' /etc/filebeat/filebeat.yml > $TMP
 mv $TMP /etc/filebeat/filebeat.yml
@@ -61,4 +113,13 @@ cat << EOF >> /etc/filebeat/filebeat.yml
 #    enabled: true
 #    paths:
 #      - /var/log/remote/192.*/*.log
+#
+# ----- Stuff for rsyslog server -----
+#module(load="imudp")
+#input(type="imudp" port="514")
+#
+#$AllowedSender UDP, 192.168.1.1/24 # Set this to local subnet
+#
+#$template RemInputLogs, "/var/log/remote/%FROMHOST-IP%/%PROGRAMNAME%.log"
+#*.* ?RemInputLogs
 EOF
