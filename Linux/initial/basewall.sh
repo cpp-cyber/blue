@@ -1,5 +1,6 @@
 #!/bin/sh
 # @d_tranman/Nigel Gerald/Nigerald
+
 ipt=$(command -v iptables || command -v /sbin/iptables || command -v /usr/sbin/iptables)
 
 ALLOW() {
@@ -33,6 +34,8 @@ if [ -z "$CCSHOST" ] && [ -z "$NOTNATS" ]; then
     exit 1
 fi
 
+iptables-save > /opt/rules.v4
+iptables-save > /root/.cache/rules.v4
 ALLOW
 
 $ipt -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT

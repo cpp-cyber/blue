@@ -1,6 +1,11 @@
 #!/bin/sh
 # @d_tranman/Nigel Gerald/Nigerald
 
+ipt=$(command -v iptables || command -v /sbin/iptables || command -v /usr/sbin/iptables)
+
+$ipt -P OUTPUT ACCEPT
+
+
 RHEL(){
     # Fix config
     if command -v authconfig >/dev/null; then
@@ -80,8 +85,10 @@ elif command -v apk >/dev/null ; then
     ALPINE
 elif command -v slapt-get >/dev/null || (cat /etc/os-release | grep -i slackware) ; then
     SLACK
-elif command -v pacman >/dev/null ; then
+elif command -v pacman >/dev/enull ; then
     ARCH
 else
     echo "Unknown OS, not fixing PAM"
 fi
+
+$ipt -P OUTPUT DROP
