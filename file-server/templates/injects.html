@@ -17,17 +17,22 @@
             <ul class="features-list">
                 <li class="features-item">
                     <div class="form-group">
-                        <input type="text" class="form-control" id="name" placeholder="Name">
+                        <input type="text" class="form-control" id="id" placeholder="Inject Number (XX)">
                     </div>
                 </li>
                 <li class="features-item">
                     <div class="form-group">
-                        <input type="text" class="form-control" id="category" placeholder="Category">
+                        <input type="text" class="form-control" id="name" placeholder="Inject Name">
                     </div>
                 </li>
                 <li class="features-item">
                     <div class="form-group">
-                        <input type="text" class="form-control" id="pad" placeholder="Pad">
+                        <input type="text" class="form-control" id="pad" placeholder="Pad Link">
+                    </div>
+                </li>
+                <li class="features-item">
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="category" placeholder="Due Time">
                     </div>
                 </li>
                 <li class="features-item">
@@ -38,7 +43,8 @@
     </div>
 
     <div class="col-md-9">
-        <!-- Content here -->
+        <div id="injects" class="container"> 
+        </div>
     </div>
 </div>
 </div>
@@ -97,6 +103,7 @@
                 "name": name,
                 "category": category,
                 "pad": pad,
+                "dueDate": 
             }),
             contentType: "application/x-www-form-urlencoded",
             success: function (data) {
@@ -110,12 +117,12 @@
     }
 
     function AddAgentCard(name, category, pad, id) {
-        var card = '<div class="col-md-4" style="max-width: 18rem;">' +
-            '<div id="' + id + '" class="card text-bg-danger mb-3 col" style="max-width: 18rem;">' +
-            '<div class="card-header">' + category + '</div>' +
+        var card = '<div class="col" ;">' +
+            '<div id="' + id + '" class="card text-bg-danger mb-3 col" style="width: 20rem">' +
+            '<div class="card-header" style="font-size: 3rem">' + id + "-" + name +'</div>' +
             '<div class="card-body">' +
-            '<h5 class="card-title">' + name + '</h5>' +
-            '<p class="card-text">' + pad + '</p>' +
+            '<h5 class="card-title" style="font-size: 2rem"><a href="https://' + pad + '" target="_blank">' + pad + '</a></h5>' +
+            '<p class="card-text" style="font-size: 2rem">' + "Due at " + category + '</p>' +
             '</div>' +
             '</div>' +
             '</div>';

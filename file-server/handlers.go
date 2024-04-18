@@ -105,11 +105,11 @@ func createInject(w http.ResponseWriter, r *http.Request) {
     fmt.Println(r.Body)
     fmt.Println(r.PostForm)
     name := r.Form.Get("name")
-    fmt.Println(name)
     category := r.Form.Get("category")
     pad := r.Form.Get("pad")
+    dueDate := r.Form.Get("dueDate")
 
-    err = AddInject(name, category, pad)
+    err = AddInject(name, category, pad, dueDate)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
