@@ -1,3 +1,2 @@
-networking/networkinator/network.db
-networking/networkinator/WebService*
-.DS_Store
+uploads/*
+injects.db
