@@ -1,6 +1,9 @@
 package main
 
 import (
+    "file-server/models"
+
+    "encoding/json"
     "html/template"
     "log"
     "path/filepath"
@@ -92,28 +95,71 @@ func getInjects(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Fprintf(w, "%v\n", injects)
+    injectJSON, err := json.Marshal(injects)
+
+    w.Header().Set("Content-Type", "application/json")
+    w.Write(injectJSON)
 }
 
 func createInject(w http.ResponseWriter, r *http.Request) {
-    err := r.ParseForm()
+    decoder := json.NewDecoder(r.Body)
+    var inject models.Inject
+    err := decoder.Decode(&inject)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
     }
 
-    fmt.Println(r.Body)
-    fmt.Println(r.PostForm)
-    name := r.Form.Get("name")
-    category := r.Form.Get("category")
-    pad := r.Form.Get("pad")
-    dueDate := r.Form.Get("dueDate")
+    name := inject.Name
+    pad := inject.Pad
+    dueDate := inject.DueDate
 
-    err = AddInject(name, category, pad, dueDate)
+    err = AddInject(name, pad, dueDate)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
     }
 
     fmt.Fprintf(w, "Successfully created inject\n")
+}
+
+func editInject(w http.ResponseWriter, r *http.Request) {
+    decoder := json.NewDecoder(r.Body)
+    var inject models.Inject
+    err := decoder.Decode(&inject)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    id := inject.ID
+    status := inject.Status
+
+    err = EditInjectInDB(id, status)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    fmt.Fprintf(w, "Successfully completed inject\n")
+}
+
+func deleteInject(w http.ResponseWriter, r *http.Request) {
+    decoder := json.NewDecoder(r.Body)
+    var inject models.Inject
+    err := decoder.Decode(&inject)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    id := inject.ID
+
+    err = DeleteInjectFromDB(id)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    fmt.Fprintf(w, "Successfully deleted inject\n")
 }

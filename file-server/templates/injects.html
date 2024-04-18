@@ -1,7 +1,4 @@
 {{ define "body" }}
-<head>
-    <link rel="stylesheet" href="/assets/css/style.css">
-</head>
 <div class="container-fluid">
     <div class="col-md-3">
         <div class="side-bar">
@@ -17,11 +14,6 @@
             <ul class="features-list">
                 <li class="features-item">
                     <div class="form-group">
-                        <input type="text" class="form-control" id="id" placeholder="Inject Number (XX)">
-                    </div>
-                </li>
-                <li class="features-item">
-                    <div class="form-group">
                         <input type="text" class="form-control" id="name" placeholder="Inject Name">
                     </div>
                 </li>
@@ -32,7 +24,7 @@
                 </li>
                 <li class="features-item">
                     <div class="form-group">
-                        <input type="text" class="form-control" id="category" placeholder="Due Time">
+                        <input type="time" class="form-control" id="time" placeholder="Due Time">
                     </div>
                 </li>
                 <li class="features-item">
@@ -80,8 +72,11 @@
             dataType: "json",
             success: function (data) {
                 for (var i = 0; i < data.length; i++) {
-                    if (document.getElementById(data[i][3]) === null) {
-                        AddAgentCard(data[i][0], data[i][1], data[i][2], data[i][3]);
+                    element = document.getElementById(data[i].ID);
+                    if (!element) {
+                        AddAgentCard(data[i].ID, data[i].Name, data[i].Pad, data[i].Status, data[i].DueDate);
+                    } else {
+                        console.log("Element already exists");
                     }
                 }
             },
@@ -91,21 +86,62 @@
         });
     }
 
+    function editInject(id, status) {
+        if (status == 1) {
+            status = "done";
+        } else {
+            status = "incomplete";
+        }
+        $.ajax({
+            url: "/api/v1/injects",
+            type: "PUT",
+            data: JSON.stringify({
+                "id": id,
+                "status": status
+            }),
+            contentType: "application/json",
+            success: function (data) {
+                GetInjects();
+                location.reload();
+            },
+            error: function (xhr, status, error) {
+                console.log("Error: " + error);
+            },
+        });
+    }
+
+    function deleteInject(id) {
+        $.ajax({
+            url: "/api/v1/injects",
+            type: "DELETE",
+            data: JSON.stringify({
+                "id": id
+            }),
+            contentType: "application/json",
+            success: function (data) {
+                GetInjects();
+                location.reload();
+            },
+            error: function (xhr, status, error) {
+                console.log("Error: " + error);
+            },
+        });
+    }
+
     function NewInject() {
         var name = $("#name").val();
-        var category = $("#category").val();
+        var time = $("#time").val();
+        console.log(time);
         var pad = $("#pad").val();
-        var id = $("#id").val();
         $.ajax({
             url: "/api/v1/injects",
             type: "POST",
             data: JSON.stringify({
                 "name": name,
-                "category": category,
                 "pad": pad,
-                "dueDate": 
+                "dueDate": time
             }),
-            contentType: "application/x-www-form-urlencoded",
+            contentType: "application/json",
             success: function (data) {
                 console.log(data);
                 GetInjects();
@@ -116,13 +152,35 @@
         });
     }
 
-    function AddAgentCard(name, category, pad, id) {
+    function AddAgentCard(id, name, pad, status, time) {
+
+        currDate = new Date();
+        currHour = currDate.getHours();
+        currMin = currDate.getMinutes();
+        dueHour = parseInt(time.substring(0, 2));
+        dueMin = parseInt(time.substring(3, 5));
+
+        if (dueHour - currHour == 0 && dueMin - currMin > 0 && status != "done") {
+            statusBG = "bg-danger";
+        } else if (dueHour - currHour <= 0 && status != "done") {
+            statusBG = "bg-danger";
+        } else if (dueHour - currHour == 1 && dueMin - currMin > 0 && status != "done") {
+            statusBG = "bg-warning";
+        } else if (dueHour - currHour >= 2 && status != "done") {
+            statusBG = "bg-info";
+        } else {
+            statusBG = "bg-success";
+        }
+
         var card = '<div class="col" ;">' +
-            '<div id="' + id + '" class="card text-bg-danger mb-3 col" style="width: 20rem">' +
-            '<div class="card-header" style="font-size: 3rem">' + id + "-" + name +'</div>' +
+            '<div id="' + id + '" class="card ' + statusBG + ' mb-3 col" style="width: 20rem">' +
+            '<div class="card-header" style="font-size: 3rem">' + id + ' - ' + name +'</div>' +
             '<div class="card-body">' +
             '<h5 class="card-title" style="font-size: 2rem"><a href="https://' + pad + '" target="_blank">' + pad + '</a></h5>' +
-            '<p class="card-text" style="font-size: 2rem">' + "Due at " + category + '</p>' +
+            '<p class="card-text" style="font-size: 2rem">' + "Due at " + time + '</p>' +
+            '<button type="button" class="btn btn-primary" onclick="editInject('+id+', 1)">Done</button>' +
+            '<button type="button" class="btn btn-primary" onclick="editInject('+id+', 0)">NOT DONE!</button>' +
+            '<button type="button" class="btn btn-primary" onclick="deleteInject('+id+')">Delete</button>' +
             '</div>' +
             '</div>' +
             '</div>';

@@ -8,7 +8,7 @@ import (
 var dir string
 
 func init() {
-    flag.StringVar(&dir, "dir", ".", "the directory to serve files from. Defaults to the current dir")
+    flag.StringVar(&dir, "dir", "./uploads", "the directory to serve files from. Defaults to the current dir")
     flag.Parse()
 }
 
@@ -25,4 +25,8 @@ func setupRoutes() {
 
     http.HandleFunc("POST /api/v1/upload", uploadFile)
     http.HandleFunc("POST /api/v1/injects", createInject)
+
+    http.HandleFunc("PUT /api/v1/injects", editInject)
+
+    http.HandleFunc("DELETE /api/v1/injects", deleteInject)
 }

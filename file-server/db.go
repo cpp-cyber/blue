@@ -15,8 +15,8 @@ func ConnectToSQLite() *gorm.DB {
     return db
 }
 
-func AddInject(name, category, pad, dueDate string) error {
-    inject := models.Inject{Name: name, Category: category, Pad: pad, Status: "Incomplete", DueDate: dueDate}
+func AddInject(name, pad, dueDate string) error {
+    inject := models.Inject{Name: name, Pad: pad, Status: "incomplete", DueDate: dueDate}
     result := db.Create(&inject)
     if result.Error != nil {
         return result.Error
@@ -40,4 +40,20 @@ func GetInjectByID(pad string) (models.Inject, error) {
         return inject, result.Error
     }
     return inject, nil
+}
+
+func EditInjectInDB(id int, status string) error {
+    result := db.Model(&models.Inject{}).Where("id = ?", id).Update("status", status)
+    if result.Error != nil {
+        return result.Error
+    }
+    return nil
+}
+
+func DeleteInjectFromDB(id int) error {
+    result := db.Where("id = ?", id).Delete(&models.Inject{})
+    if result.Error != nil {
+        return result.Error
+    }
+    return nil
 }
