@@ -16,7 +16,8 @@ func ConnectToSQLite() *gorm.DB {
 }
 
 func AddInjectToDB(ID string, name, category, pad string) error {
-    inject := models.Inject{ID: ID, Name: name, Category: category, Pad: pad, Status: "Incomplete"}
+
+    inject := models.Inject{Name: name, Pad: pad, Category: category, Status: "Incomplete"}
     result := db.Create(&inject)
     if result.Error != nil {
         return result.Error

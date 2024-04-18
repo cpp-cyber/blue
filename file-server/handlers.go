@@ -92,12 +92,12 @@ func getInjects(w http.ResponseWriter, r *http.Request) {
 func createInject(w http.ResponseWriter, r *http.Request) {
     r.ParseForm()
 
-    name := r.FormValue("name")
-    category := r.FormValue("category")
-    pad := r.FormValue("pad")
     id := r.FormValue("id")
+    name := r.FormValue("name")
+    pad := r.FormValue("pad")
+    category := r.FormValue("category")
 
-    err := AddInjectToDB(name, category, pad, id)
+    err := AddInjectToDB(id, name, pad, category)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return

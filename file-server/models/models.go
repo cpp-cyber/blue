@@ -1,7 +1,7 @@
 package models
 
 type Inject struct {
-    ID         string `gorm:"primaryKey"`
+    ID         uint64 `gorm:"primaryKey;autoIncrement"` 
     Name       string
     Category   string
     Pad        string
