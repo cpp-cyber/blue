@@ -7,3 +7,7 @@ type Inject struct {
     Status     string
     DueDate    string
 }
+
+type Path struct {
+    Path       string
+}

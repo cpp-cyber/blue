@@ -4,6 +4,7 @@ import (
     "file-server/models"
 
     "encoding/json"
+    "strings"
     "html/template"
     "log"
     "path/filepath"
@@ -13,7 +14,23 @@ import (
     "io"
 )
 
+func echo(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Hello, World!")
+}
+
 func serveTemplate(w http.ResponseWriter, r *http.Request) {
+    if strings.Contains(r.URL.Path, "/files/") {
+        fmt.Println(r.URL.Path)
+        serveFiles(w, r)
+        return
+    }
+
+    if strings.Contains(r.URL.Path, "/download/") {
+        fmt.Println(r.URL.Path)
+        downloadFile(w, r)
+        return
+    }
+
     lp := filepath.Join("templates", "layout.html")
     fp := filepath.Join("templates", filepath.Clean(r.URL.Path) + ".html")
     fmt.Println(fp)
@@ -49,13 +66,7 @@ func serveTemplate(w http.ResponseWriter, r *http.Request) {
     }
 }
 
-func echo(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprintf(w, "Hello, World!")
-}
-
 func uploadFile(w http.ResponseWriter, r *http.Request) {
-    fmt.Println("File uploaded")
-
     r.ParseMultipartForm(10 << 20)
     file, handler, err := r.FormFile("myFile")
     if err != nil {
@@ -68,7 +79,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
     fmt.Printf("File Size: %+v\n", handler.Size)
     fmt.Printf("MIME Header: %+v\n", handler.Header)
 
-    if _, err := os.Stat("uploads/" + handler.Filename); os.IsNotExist(err) {
+    if _, err := os.Stat("uploads/" + handler.Filename); err == nil {
         http.Error(w, "File already exists", http.StatusInternalServerError)
         return
     }
@@ -85,7 +96,8 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Fprintf(w, "Successfully uploaded file\n")
+    fmt.Printf("Uploaded File: %+v\n", handler.Filename)
+    http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func getInjects(w http.ResponseWriter, r *http.Request) {
@@ -162,4 +174,26 @@ func deleteInject(w http.ResponseWriter, r *http.Request) {
     }
 
     fmt.Fprintf(w, "Successfully deleted inject\n")
+}
+
+func createDirectory(w http.ResponseWriter, r *http.Request) {
+    decoder := json.NewDecoder(r.Body)
+    var path models.Path
+    err := decoder.Decode(&path)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    name := path.Path
+    dirPath := filepath.Join("uploads", name)
+    dirPath = filepath.Clean(dirPath)
+    dirPath = filepath.ToSlash(dirPath)
+    err = os.Mkdir(dirPath, os.ModePerm)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    fmt.Fprintf(w, "Successfully created directory\n")
 }
