@@ -82,6 +82,7 @@ func downloadFile(w http.ResponseWriter, r *http.Request) {
     filePath := filepath.Join(dir, newDir)
 
     fmt.Println("===================================== DOWNLOAD =====================================")
+    fmt.Println("Client IP: ", r.RemoteAddr)
     fmt.Println("Downloaded File: ", filePath)
     fmt.Println("====================================================================================")
 

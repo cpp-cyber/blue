@@ -19,6 +19,11 @@ func echo(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveTemplate(w http.ResponseWriter, r *http.Request) {
+    log.Println("===================================== REQUEST =====================================")
+    log.Println("Client IP: ", r.RemoteAddr)
+    log.Println("Page Requested: ", r.URL.Path)
+    log.Println("===================================================================================")
+
     if strings.Contains(r.URL.Path, "/download/") {
         downloadFile(w, r)
         return
@@ -35,12 +40,13 @@ func serveTemplate(w http.ResponseWriter, r *http.Request) {
     info, err := os.Stat(fp)
     if err != nil {
         if os.IsNotExist(err) {
-            http.NotFound(w, r)
+            http.Error(w, "404 page not found", http.StatusNotFound)
             return
         }
     }
 
     if info.IsDir() {
+        http.Error(w, "404 page not found", http.StatusNotFound)
         http.NotFound(w, r)
         return
     }
