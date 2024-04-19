@@ -93,7 +93,7 @@ token=$(/usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token  --sc
 systemctl restart kibana
 
 # Testing stuff with filebeat
-export CA=$(openssl x509 -fingerprint -sha256 -noout -in /etc/elasticsearch/certs/http_ca.crt | awk --field-separator="=" '{print $2}' | sed 's/://g')
+CA=$(openssl x509 -fingerprint -sha256 -noout -in /etc/elasticsearch/certs/http_ca.crt | awk -F '=' '{print $2}' | sed 's/://g')
 if [ -z "$IS_RHEL" ]; then
     PASS=$(yes | /usr/share/elasticsearch/bin/elasticsearch-reset-password -s -u 'elastic')
 else
@@ -102,6 +102,7 @@ fi
 echo $PASS
 sed -e 's/hosts: \["localhost:9200"\]/hosts: \["https:\/\/localhost:9200"\]/g; /hosts: \["https:\/\/localhost:9200"\]/a \ \n  username: "elastic"\n  password: "'"$PASS"'"\n  ssl:\n    enabled: true\n    ca_trusted_fingerprint: "'"$CA"'"' /etc/filebeat/filebeat.yml > $TMP
 mv $TMP /etc/filebeat/filebeat.yml
+filebeat setup --index-management -E output.logstash.enabled=false  -E "output.elasticsearch.ssl.enabled=true" -E "output.elasticsearch.ssl.ca_trusted_fingerprint=$CA" -E 'output.elasticsearch.hosts=["https://127.0.0.1:9200"]'
 
 cat << EOF >> /etc/filebeat/filebeat.yml
 
@@ -113,13 +114,15 @@ cat << EOF >> /etc/filebeat/filebeat.yml
 #    enabled: true
 #    paths:
 #      - /var/log/remote/192.*/*.log
-#
+# # Change to correct subnet. Don't include 127.0.0.1
+
+
 # ----- Stuff for rsyslog server -----
 #module(load="imudp")
 #input(type="imudp" port="514")
 #
-#$AllowedSender UDP, 192.168.1.1/24 # Set this to local subnet
+#\$AllowedSender UDP, 192.168.1.1/24 # Set this to local subnet
 #
-#$template RemInputLogs, "/var/log/remote/%FROMHOST-IP%/%PROGRAMNAME%.log"
+#\$template RemInputLogs, "/var/log/remote/%FROMHOST-IP%-%SOURCE%/%PROGRAMNAME%.log"
 #*.* ?RemInputLogs
 EOF
