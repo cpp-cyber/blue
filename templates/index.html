@@ -1,69 +1,150 @@
-{{ define "body" }}
-<div class="h-75 d-flex align-items-center justify-content-center">
-    <div class="w-50 p-3">
-        <div class="input-group mb-1">
-            <label for="file" class="form-control drop-container" id="dropcontainer">
-                <span id="fileText" class="drop-title">Drop or paste files here</span>
-                <input type="file" id="file" name="file" hidden/>
-            </label>
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+    <head>
+        <title>file-server</title>
+        <meta charset="utf-8">
+        <link rel="icon" href="data:,">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
+        <link rel="stylesheet" href="/assets/css/style.css"/>
+        <link rel="stylesheet" href="/assets/bootstrap/css/bootstrap.min.css"/>
+        <script src="/assets/bootstrap/js/bootstrap.bundle.min.js"></script>
+        <script src="/assets/jQuery-3.7.0/jquery-3.7.0.min.js"></script>
+        <link rel="stylesheet" href="/assets/css/style.css">
+    </head>
+
+    <nav class="navbar navbar-expand-sm">
+        <div class="container-fluid">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/injects/">Injects</a>
+                </li>
+            </ul>
         </div>
-        <button class="btn btn-outline-primary w-100" id="upload" onclick="uploadFile()">Upload</button>
-    </div>
-</div>
-<script>
+    </nav>
 
-    const dropContainer = document.getElementById("dropcontainer")
-    const fileInput = document.getElementById("file")
-    const fileText = document.getElementById("fileText")
+    <body>
+        <div class="h-100 d-flex alight-items-center justify-content-center">
+            <div>
+                <h1>Files</h1>
+                <ul class="list-group">
+                    {{if ne .Path ""}}
+                    <li class="list-group-item">
+                        <a href="/">⬆️</a>
+                    </li>
+                    {{end}}
+                    {{range .Files}}
+                    <li class="list-group-item">
 
-    dropContainer.addEventListener("dragover", (e) => {
-        e.preventDefault()
-    }, false)
+                        {{ if .IsDir }}
+                        <a class="" href="/{{.Path}}/">
+                            📁 {{.Name}}/
+                        </a>
+                        {{else}}
+                        <a class="" href="/download/{{.Path}}">
+                            {{.Name}}
+                        </a>
+                        {{end}}
+                        {{end}}
+                    </li>
+                    <li class="list-group-item">
+                        <input type="text" id="path" name="path">
+                        <input type="submit" value="Create Directory" onclick="createDir()">
+                    </li>
+                </ul>
+                <br>
+                <div class="input-group mb-1">
+                    <label for="file" class="form-control drop-container" id="dropcontainer">
+                        <span id="fileText" class="drop-title">Drop or paste files here</span>
+                        <input type="file" id="file" name="file" hidden/>
+                    </label>
+                </div>
+                <button class="btn btn-outline-primary w-100" id="upload" onclick="uploadFile()">Upload</button>
+            </div>
+        </div>
+        <script>
 
-    dropContainer.addEventListener("dragenter", () => {
-        dropContainer.classList.add("drag-active")
-    })
+            const dropContainer = document.getElementById("dropcontainer")
+            const fileInput = document.getElementById("file")
+            const fileText = document.getElementById("fileText")
 
-    dropContainer.addEventListener("dragleave", () => {
-        dropContainer.classList.remove("drag-active")
-    })
+            dropContainer.addEventListener("dragover", (e) => {
+                e.preventDefault()
+            }, false)
 
-    dropContainer.addEventListener("drop", (e) => {
-        e.preventDefault()
-        dropContainer.classList.remove("drag-active")
-        fileInput.files = e.dataTransfer.files
-        fileText.innerText = fileInput.files[0].name
-    })
+            dropContainer.addEventListener("dragenter", () => {
+                dropContainer.classList.add("drag-active")
+            })
 
-    dropContainer.addEventListener("paste", (e) => {
-        console.log(e)
-        e.preventDefault()
-        fileInput.files = e.clipboardData.files
-        console.log(fileInput.files)
-        fileText.innerText = fileInput.files[0].name
-    })
+            dropContainer.addEventListener("dragleave", () => {
+                dropContainer.classList.remove("drag-active")
+            })
 
-    fileInput.addEventListener("change", () => {
-        fileText.innerText = fileInput.files[0].name
-    })
+            dropContainer.addEventListener("drop", (e) => {
+                e.preventDefault()
+                dropContainer.classList.remove("drag-active")
+                fileInput.files = e.dataTransfer.files
+                fileText.innerText = fileInput.files[0].name
+            })
 
-    function uploadFile() {
-        var file = document.getElementById('file').files[0];
-        var formData = new FormData();
-        formData.append('file', file);
-        fetch('/api/v1/upload', {
-            method: 'POST',
-            body: formData,
-            ContentType: 'multipart/form-data'
-        }).then(response => {
-            if (response.ok) {
-                alert('File uploaded successfully');
-            } else {
-                alert('File upload failed');
+            dropContainer.addEventListener("paste", (e) => {
+                console.log(e)
+                e.preventDefault()
+                fileInput.files = e.clipboardData.files
+                console.log(fileInput.files)
+                fileText.innerText = fileInput.files[0].name
+            })
+
+            fileInput.addEventListener("change", () => {
+                fileText.innerText = fileInput.files[0].name
+            })
+
+            function uploadFile() {
+                var file = document.getElementById('file').files[0];
+                var formData = new FormData();
+                var path = window.location.pathname.substring(1);
+                formData.append('file', file);
+                formData.append('path', path);
+                fetch('/api/v1/upload', {
+                    method: 'POST',
+                    body: formData,
+                    ContentType: 'multipart/form-data'
+                }).then(response => {
+                    if (response.ok) {
+                        alert('File uploaded successfully');
+                        window.location.reload();
+                    } else {
+                        alert('File upload failed');
+                    }
+                });
             }
-        });
-    }
-</script>
 
+            function createDir() {
+                path = $("#path").val();
+                if (/^[a-zA-Z0-9_-]*$/.test(path) == false) {
+                    alert("Invalid path. Only alphanumeric characters, underscores, and hyphens are allowed.");
+                    return;
+                }
+                currentPath = window.location.pathname.substring(1);
+                console.log(currentPath);
+                path = '/' + currentPath + path
+                $.ajax({
+                    type: "POST",
+                    url: "/api/v1/dir",
+                    data: JSON.stringify({
+                        "Path": path
+                    }),
+                    contentType: "application/json",
+                    success: function(data) {
+                        console.log(path); 
+                        window.location.reload();
+                    }
+                });
+            }
+        </script>
+    </body>
+</html>
 
-{{ end }}

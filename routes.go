@@ -21,8 +21,6 @@ func setupRoutes() {
     http.HandleFunc("GET /", serveTemplate)
     http.HandleFunc("GET /api/v1/echo", echo)
     http.HandleFunc("GET /api/v1/injects", getInjects)
-    //http.HandleFunc("GET /files/", serveFiles)
-    //http.HandleFunc("GET /download/{path}", downloadFile)
 
     http.HandleFunc("POST /api/v1/upload", uploadFile)
     http.HandleFunc("POST /api/v1/injects", createInject)

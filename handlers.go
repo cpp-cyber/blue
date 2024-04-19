@@ -19,24 +19,17 @@ func echo(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveTemplate(w http.ResponseWriter, r *http.Request) {
-    if strings.Contains(r.URL.Path, "/files/") {
-        fmt.Println(r.URL.Path)
-        serveFiles(w, r)
-        return
-    }
-
     if strings.Contains(r.URL.Path, "/download/") {
-        fmt.Println(r.URL.Path)
         downloadFile(w, r)
         return
     }
 
     lp := filepath.Join("templates", "layout.html")
     fp := filepath.Join("templates", filepath.Clean(r.URL.Path) + ".html")
-    fmt.Println(fp)
 
-    if fp == "templates" || fp == "templates\\.html" {
-        fp = "templates/index.html"
+    if fp == "templates" || fp == "templates\\.html" || fp != "templates\\injects.html" {
+        serveFiles(w, r)
+        return
     }
 
     info, err := os.Stat(fp)
@@ -81,16 +74,19 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Printf("Uploaded File: %+v\n", handler.Filename)
-    fmt.Printf("File Size: %+v\n", handler.Size)
-    fmt.Printf("MIME Header: %+v\n", handler.Header)
+    uploadPath := r.FormValue("path")
+
+    uploadPath = filepath.Join("uploads", uploadPath)
+
 
     if _, err := os.Stat("uploads/" + handler.Filename); err == nil {
         http.Error(w, "File already exists", http.StatusInternalServerError)
         return
     }
 
-    dst, err := os.Create("uploads/" + handler.Filename)
+    filePath := filepath.Join(uploadPath, handler.Filename)
+
+    dst, err := os.Create(filePath)
     defer dst.Close()
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -102,7 +98,12 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    fmt.Println("===================================== FILE UPLOAD =====================================")
+    fmt.Printf("Client IP: %s\n", r.RemoteAddr)
+    fmt.Printf("Upload Path: %s\n", uploadPath)
     fmt.Printf("Uploaded File: %+v\n", handler.Filename)
+    fmt.Println("======================================================================================")
+
     http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

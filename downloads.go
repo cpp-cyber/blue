@@ -38,8 +38,7 @@ func FilePathWalkDir(root string) ([]File, error) {
 }
 
 func serveFiles(w http.ResponseWriter, r *http.Request) {
-    newDir := strings.TrimPrefix(r.URL.Path, "/files/")
-    newDir = filepath.Clean(newDir)
+    newDir := filepath.Clean(r.URL.Path)
 
     files, err := FilePathWalkDir(filepath.Join(dir, newDir))
     if err != nil {
@@ -54,11 +53,23 @@ func serveFiles(w http.ResponseWriter, r *http.Request) {
         Path: newDir,
     }
 
-    tmpl, err := template.ParseFiles(filepath.Join("templates", "files.html"))
+    data.Files = func () []File {
+        for i, file := range data.Files {
+            data.Files[i].Path = strings.Replace(file.Path, "\\", "/", -1)
+            data.Files[i].Path = strings.TrimPrefix(data.Files[i].Path, "uploads/")
+        }
+        return data.Files
+    }()
+
+    data.Path = func () string {
+        return strings.Replace(data.Path, "\\", "/", -1)
+    }()
+
+    tmpl, err := template.ParseFiles(filepath.Join("templates", "index.html"))
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
-    err = tmpl.ExecuteTemplate(w, "files.html", data)
+    err = tmpl.ExecuteTemplate(w, "index.html", data)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
