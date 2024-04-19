@@ -14,7 +14,7 @@
             <ul class="features-list">
                 <li class="features-item">
                     <div class="form-group">
-                        <input type="text" class="form-control" id="name" placeholder="Inject Name">
+                        <input type="text" class="form-control" id="name" placeholder="XX - Inject Name">
                     </div>
                 </li>
                 <li class="features-item">
@@ -168,13 +168,16 @@
             statusBG = "bg-warning";
         } else if (dueHour - currHour >= 2 && status != "done") {
             statusBG = "bg-dark";
-        } else {
+        } else if (status == "done"){
             statusBG = "bg-success";
+        } else {
+            statusBG = "bg-warning";
         }
+
 
         var card = '<div class="col" ;">' +
             '<div id="' + id + '" class="card ' + statusBG + ' mb-3 col" style="width: 40rem">' +
-            '<div class="card-header" style="font-size: 3rem">' + id + ' - ' + name +'</div>' +
+            '<div class="card-header" style="font-size: 3rem">' + name +'</div>' + 
             '<div class="card-body">' +
             '<h5 class="card-title" style="font-size: 2rem"><a href="' + pad + '" target="_blank">' + pad + '</a></h5>' +
             '<p class="card-text" style="font-size: 2rem">' + "Due at " + time + '</p>' +

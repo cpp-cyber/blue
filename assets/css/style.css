@@ -33,6 +33,10 @@ h1 {
     padding-top: 0;
 }
 
+.bg-dark {
+    background-color: #35063e !important;
+}
+
 .navbar {
     background-color: #0d1b2a; 
     display: flex;
@@ -91,6 +95,13 @@ h1 {
     color: #fff;
     cursor: pointer;
     transition: background .2s ease-in-out;
+    postion: relative;
+}
+
+.btn-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .hidden {
