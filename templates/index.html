@@ -31,9 +31,9 @@
             <div>
                 <h1>Files</h1>
                 <ul class="list-group">
-                    {{if ne .Path ""}}
+                    {{if ne .Path "/"}}
                     <li class="list-group-item">
-                        <a href="/">⬆️</a>
+                        <a href="{{.Path}}/../">⬆️</a>
                     </li>
                     {{end}}
                     {{range .Files}}

@@ -75,16 +75,13 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
     }
 
     uploadPath := r.FormValue("path")
+    uploadPath = filepath.Join(dir, uploadPath)
+    filePath := filepath.Join(uploadPath, handler.Filename)
 
-    uploadPath = filepath.Join("uploads", uploadPath)
-
-
-    if _, err := os.Stat("uploads/" + handler.Filename); err == nil {
+    if _, err := os.Stat(filePath); err == nil {
         http.Error(w, "File already exists", http.StatusInternalServerError)
         return
     }
-
-    filePath := filepath.Join(uploadPath, handler.Filename)
 
     dst, err := os.Create(filePath)
     defer dst.Close()
@@ -102,7 +99,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
     fmt.Printf("Client IP: %s\n", r.RemoteAddr)
     fmt.Printf("Upload Path: %s\n", uploadPath)
     fmt.Printf("Uploaded File: %+v\n", handler.Filename)
-    fmt.Println("======================================================================================")
+    fmt.Println("=======================================================================================")
 
     http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -193,7 +190,7 @@ func createDirectory(w http.ResponseWriter, r *http.Request) {
     }
 
     name := path.Path
-    dirPath := filepath.Join("uploads", name)
+    dirPath := filepath.Join(dir, name)
     dirPath = filepath.Clean(dirPath)
     dirPath = filepath.ToSlash(dirPath)
     err = os.Mkdir(dirPath, os.ModePerm)

@@ -80,7 +80,10 @@ func downloadFile(w http.ResponseWriter, r *http.Request) {
     newDir = filepath.Clean(newDir)
 
     filePath := filepath.Join(dir, newDir)
+
+    fmt.Println("===================================== DOWNLOAD =====================================")
     fmt.Println("Downloaded File: ", filePath)
+    fmt.Println("====================================================================================")
 
     if _, err := os.Stat(filePath); os.IsNotExist(err) {
         http.Error(w, "File not found", http.StatusNotFound)
