@@ -96,7 +96,10 @@ if command -v 'docker' > /dev/null ; then
 fi
 
 ###
-$ipt -P FORWARD ACCEPT; $ipt -P OUTPUT DROP;
+$ipt -P FORWARD ACCEPT; 
+
+# Drop outbound via direct rule rather than policy
+$ipt -A OUTPUT -j DROP; 
 
 echo "Done"
 
