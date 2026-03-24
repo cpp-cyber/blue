@@ -1,9 +1,5 @@
 #!/bin/sh
-# @d_tranman/Nigel Gerald/Nigerald
-# Fast inventory script with optional tmux layout, minimal-output checks,
-# Kubernetes support, realmd domain detection, OS-specific config-path checks,
-# per-service empty backup directories, enum logs in /root/.cache/enum,
-# and common service misconfiguration checks.
+# @d_tranman/Nigel Gerald/Nigerald's inventory but with extra steps - adam
 
 IS_RHEL=false
 IS_DEBIAN=false
