@@ -1,5 +1,5 @@
 #!/bin/sh
-# @d_tranman/Nigel Gerald/Nigerald's inventory script with extra steps - adam
+# @d_tranman/Nigel Gerald/Nigerald's inventory script with extra steps -adam
 
 IS_RHEL=false
 IS_DEBIAN=false
@@ -341,19 +341,15 @@ get_nginx_config_paths() {
 
 get_lighttpd_config_paths() {
     out=""
-
     out="$(append_if_exists "$out" /etc/lighttpd/lighttpd.conf)"
     [ -d /etc/lighttpd/conf.d ] && out="$(append_if_exists "$out" /etc/lighttpd/conf.d)"
-
     printf '%s\n' "$out" | awk 'NF' | sort -u
 }
 
 get_caddy_config_paths() {
     out=""
-
     out="$(append_if_exists "$out" /etc/caddy/Caddyfile)"
     out="$(append_if_exists "$out" /usr/local/etc/caddy/Caddyfile)"
-
     printf '%s\n' "$out" | awk 'NF' | sort -u
 }
 
@@ -394,14 +390,12 @@ get_postgres_config_paths() {
 
 get_php_config_paths() {
     out=""
-
     out="$(append_if_exists "$out" /etc/php.ini)"
     [ -d /etc/php ] && out="$(append_if_exists "$out" /etc/php)"
     [ -d /etc/php.d ] && out="$(append_if_exists "$out" /etc/php.d)"
     [ -d /etc/php5 ] && out="$(append_if_exists "$out" /etc/php5)"
     [ -d /etc/php7 ] && out="$(append_if_exists "$out" /etc/php7)"
     [ -d /etc/php8 ] && out="$(append_if_exists "$out" /etc/php8)"
-
     printf '%s\n' "$out" | awk 'NF' | sort -u
 }
 
@@ -479,15 +473,6 @@ get_service_config_paths() {
     esac
 }
 
-print_service_config_locations() {
-    svc="$1"
-    echo "[+] $svc config locations"
-    get_service_config_paths "$svc"
-    echo
-}
-
-# Comment-aware config matcher.
-# Outputs matching lines from active, uncommented config entries only.
 grep_service_files() {
     pattern="$1"
     shift
@@ -496,22 +481,631 @@ grep_service_files() {
         [ -e "$p" ] || continue
 
         if [ -f "$p" ]; then
-            awk -v pat="$pattern" '
-                /^[[:space:]]*#/ { next }
-                /^[[:space:]]*$/ { next }
-                $0 ~ pat { print FILENAME ":" FNR ":" $0 }
-            ' "$p" 2>/dev/null
+            grep -nEv '^[[:space:]]*#|^[[:space:]]*$' "$p" 2>/dev/null \
+                | grep -E "$pattern" 2>/dev/null \
+                | sed "s#^#$p:#"
         elif [ -d "$p" ]; then
             for f in "$p"/*; do
                 [ -f "$f" ] || continue
-                awk -v pat="$pattern" '
-                    /^[[:space:]]*#/ { next }
-                    /^[[:space:]]*$/ { next }
-                    $0 ~ pat { print FILENAME ":" FNR ":" $0 }
-                ' "$f" 2>/dev/null
+                grep -nEv '^[[:space:]]*#|^[[:space:]]*$' "$f" 2>/dev/null \
+                    | grep -E "$pattern" 2>/dev/null \
+                    | sed "s#^#$f:#"
             done
         fi
     done
+}
+
+ssh_vuln_check() {
+    paths="$(service_config_paths ssh)"
+    found=0
+    matches=""
+
+    echo "[SSH]"
+
+    matches="$(grep_service_files 'PermitRootLogin[[:space:]]+yes([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] PermitRootLogin yes present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'PasswordAuthentication[[:space:]]+yes([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] PasswordAuthentication yes present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'PubkeyAuthentication[[:space:]]+no([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] PubkeyAuthentication no present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'PermitEmptyPasswords[[:space:]]+yes([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] PermitEmptyPasswords yes present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'MaxAuthTries[[:space:]]+([6-9]|[1-9][0-9]+)([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] High MaxAuthTries value present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'AllowUsers[[:space:]]+' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] AllowUsers restriction present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'AllowGroups[[:space:]]+' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] AllowGroups restriction present"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common SSH misconfigs found"
+    echo
+}
+
+vsftpd_vuln_check() {
+    paths="$(service_config_paths vsftpd)"
+    found=0
+    matches=""
+
+    echo "[vsftpd]"
+
+    matches="$(grep_service_files 'anonymous_enable[[:space:]]*=[[:space:]]*YES([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] anonymous_enable=YES present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'write_enable[[:space:]]*=[[:space:]]*YES([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] write_enable=YES present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'anon_upload_enable[[:space:]]*=[[:space:]]*YES([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] anon_upload_enable=YES present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'anon_mkdir_write_enable[[:space:]]*=[[:space:]]*YES([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] anon_mkdir_write_enable=YES present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'no_anon_password[[:space:]]*=[[:space:]]*YES([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] no_anon_password=YES present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'chroot_local_user[[:space:]]*=[[:space:]]*NO([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] chroot_local_user=NO present"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common vsftpd misconfigs found"
+    echo
+}
+
+proftpd_vuln_check() {
+    paths="$(service_config_paths proftpd)"
+    found=0
+    matches=""
+
+    echo "[ProFTPD]"
+
+    matches="$(grep_service_files '<Anonymous[[:space:]]' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] Anonymous block present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'RequireValidShell[[:space:]]+off([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] RequireValidShell off present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'RootLogin[[:space:]]+on([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] RootLogin on present"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common ProFTPD misconfigs found"
+    echo
+}
+
+pureftpd_vuln_check() {
+    found=0
+    matches=""
+
+    echo "[Pure-FTPd]"
+
+    matches="$(grep_service_files 'yes([[:space:]]|$)' /etc/pure-ftpd/conf/AnonymousOnly | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] AnonymousOnly enabled"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'yes([[:space:]]|$)' /etc/pure-ftpd/conf/AnonymousCanCreateDirs | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] AnonymousCanCreateDirs enabled"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'yes([[:space:]]|$)' /etc/pure-ftpd/conf/NoAnonymous | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] NoAnonymous enabled"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common Pure-FTPd misconfigs found"
+    echo
+}
+
+tftp_vuln_check() {
+    paths="$(service_config_paths tftpd)"
+    found=0
+    matches=""
+
+    echo "[TFTP]"
+
+    matches="$(grep_service_files '--create|-c([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] TFTP create/upload option present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'disable[[:space:]]*=[[:space:]]*no([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] xinetd tftp service enabled"
+        found=1
+    fi
+
+    matches="$(grep_service_files '-s([[:space:]]|$)|--secure([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] TFTP secure root option present"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common TFTP misconfigs found"
+    echo
+}
+
+apache_vuln_check() {
+    paths="$(service_config_paths apache)"
+    found=0
+    matches=""
+
+    echo "[Apache]"
+
+    matches="$(grep_service_files 'Options[[:space:]]+.*Indexes' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] Directory indexing enabled"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'ServerTokens[[:space:]]+Full([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] ServerTokens Full present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'ServerSignature[[:space:]]+On([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] ServerSignature On present"
+        found=1
+    fi
+
+    matches="$(grep_service_files '<Directory[[:space:]]+/?>' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] Broad root directory block present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'php_admin_flag|php_value|php_flag|SetHandler.*php|FilesMatch.*php' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] PHP handling reference present"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common Apache misconfigs found"
+    echo
+}
+
+nginx_vuln_check() {
+    paths="$(service_config_paths nginx)"
+    found=0
+    matches=""
+
+    echo "[Nginx]"
+
+    matches="$(grep_service_files 'autoindex[[:space:]]+on;?' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] autoindex on present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'dav_methods[[:space:]]' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] WebDAV methods enabled"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'location[[:space:]]+~[[:space:]].*\.php|fastcgi_pass' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] PHP/FastCGI handling present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'client_max_body_size[[:space:]]+[0-9]{2,}[mMgG];?' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] Large upload size configured"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common Nginx misconfigs found"
+    echo
+}
+
+mysql_vuln_check() {
+    paths="$(service_config_paths mysql)"
+    found=0
+    matches=""
+
+    echo "[MySQL / MariaDB]"
+
+    matches="$(grep_service_files 'bind-address[[:space:]]*=[[:space:]]*0\.0\.0\.0([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] bind-address=0.0.0.0 present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'skip-grant-tables([[:space:]]|$)|skip-grant-tables[[:space:]]*=[[:space:]]*1([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] skip-grant-tables present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'local-infile[[:space:]]*=[[:space:]]*1([[:space:]]|$)|local_infile[[:space:]]*=[[:space:]]*1([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] local-infile enabled"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'skip-name-resolve([[:space:]]|$)|skip_name_resolve([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] skip-name-resolve present"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common MySQL/MariaDB misconfigs found"
+    echo
+}
+
+postgres_vuln_check() {
+    paths="$(service_config_paths postgres)"
+    found=0
+    matches=""
+
+    echo "[PostgreSQL]"
+
+    for p in $paths; do
+        if [ -f "$p/pg_hba.conf" ]; then
+            matches="$(grep_service_files 'host[[:space:]]+all[[:space:]]+all[[:space:]]+0\.0\.0\.0/0[[:space:]]+(trust|md5|password)' "$p/pg_hba.conf" | head -n 5)"
+            if [ -n "$matches" ]; then
+                echo "$matches"
+                echo "  [!] Broad 0.0.0.0/0 host rule present"
+                found=1
+            fi
+
+            matches="$(grep_service_files 'local[[:space:]]+all[[:space:]]+all[[:space:]]+trust([[:space:]]|$)' "$p/pg_hba.conf" | head -n 5)"
+            if [ -n "$matches" ]; then
+                echo "$matches"
+                echo "  [!] local trust authentication present"
+                found=1
+            fi
+        fi
+
+        if [ -f "$p/postgresql.conf" ]; then
+            matches="$(grep_service_files "listen_addresses[[:space:]]*=[[:space:]]*'\\*'" "$p/postgresql.conf" | head -n 5)"
+            if [ -n "$matches" ]; then
+                echo "$matches"
+                echo "  [!] listen_addresses='*' present"
+                found=1
+            fi
+        fi
+    done
+
+    [ "$found" -eq 1 ] || echo "  No common PostgreSQL misconfigs found"
+    echo
+}
+
+php_vuln_check() {
+    paths="$(service_config_paths php)"
+    found=0
+    matches=""
+
+    echo "[PHP]"
+
+    matches="$(grep_service_files 'display_errors[[:space:]]*=[[:space:]]*On([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] display_errors=On present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'allow_url_include[[:space:]]*=[[:space:]]*On([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] allow_url_include=On present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'allow_url_fopen[[:space:]]*=[[:space:]]*On([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] allow_url_fopen=On present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'expose_php[[:space:]]*=[[:space:]]*On([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] expose_php=On present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'disable_functions[[:space:]]*=' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] disable_functions configured"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common PHP misconfigs found"
+    echo
+}
+
+smb_vuln_check() {
+    paths="$(service_config_paths smbd)"
+    found=0
+    matches=""
+
+    echo "[Samba]"
+
+    matches="$(grep_service_files 'map[[:space:]]+to[[:space:]]+guest[[:space:]]*=[[:space:]]*Bad User' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] map to guest = Bad User present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'guest[[:space:]]+ok[[:space:]]*=[[:space:]]*yes' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] guest ok = yes present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'guest[[:space:]]+only[[:space:]]*=[[:space:]]*yes' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] guest only = yes present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'writable[[:space:]]*=[[:space:]]*yes|write[[:space:]]+ok[[:space:]]*=[[:space:]]*yes' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] Writable share setting present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'browseable[[:space:]]*=[[:space:]]*yes' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] browseable shares present"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common Samba misconfigs found"
+    echo
+}
+
+snmp_vuln_check() {
+    paths="$(service_config_paths snmpd)"
+    found=0
+    matches=""
+
+    echo "[SNMP]"
+
+    matches="$(grep_service_files 'rocommunity[[:space:]]+public([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] rocommunity public present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'rwcommunity[[:space:]]+' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] rwcommunity present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'rocommunity6[[:space:]]+public([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] rocommunity6 public present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'agentAddress[[:space:]].*0\.0\.0\.0' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] agentAddress bound broadly"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common SNMP misconfigs found"
+    echo
+}
+
+squid_vuln_check() {
+    paths="$(service_config_paths squid)"
+    found=0
+    matches=""
+
+    echo "[Squid]"
+
+    matches="$(grep_service_files 'http_access[[:space:]]+allow[[:space:]]+all([[:space:]]|$)' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] http_access allow all present"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'acl[[:space:]]+localnet[[:space:]]+src[[:space:]]+0\.0\.0\.0/0' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] localnet defined as 0.0.0.0/0"
+        found=1
+    fi
+
+    matches="$(grep_service_files 'http_port[[:space:]]+[0-9]+' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [+] Squid http_port configured"
+        found=1
+    fi
+
+    [ "$found" -eq 1 ] || echo "  No common Squid misconfigs found"
+    echo
+}
+
+telnet_vuln_check() {
+    echo "[Telnet]"
+    echo "  [!] Telnet service detected"
+    echo
+}
+
+cockpit_vuln_check() {
+    paths="$(service_config_paths cockpit)"
+    matches=""
+
+    echo "[Cockpit]"
+    echo "  [!] Cockpit service detected"
+
+    matches="$(grep_service_files 'AllowUnencrypted[[:space:]]*=[[:space:]]*true' $paths | head -n 5)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] AllowUnencrypted=true present"
+    fi
+
+    echo
+}
+
+xinetd_vuln_check() {
+    matches=""
+
+    echo "[xinetd / inetd]"
+
+    if [ -d /etc/xinetd.d ]; then
+        echo "  [+] /etc/xinetd.d present"
+    fi
+
+    matches="$(grep_service_files 'disable[[:space:]]*=[[:space:]]*no([[:space:]]|$)' /etc/xinetd.d | head -n 10)"
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "  [!] Enabled xinetd service entries present"
+    else
+        echo "  No common xinetd/inetd misconfigs found"
+    fi
+
+    echo
+}
+
+web_root_review() {
+    echo "[Web root checks]"
+    roots="$(get_web_root_candidates)"
+    if [ -z "$roots" ]; then
+        echo "  No default web roots found"
+        echo
+        return 0
+    fi
+
+    echo "$roots" | while read -r rootdir; do
+        [ -d "$rootdir" ] || continue
+
+        echo "--- $rootdir"
+
+        WWF_COUNT="$(ls -ld "$rootdir" "$rootdir"/* 2>/dev/null | awk '$1 ~ /.......w./ && $1 !~ /^d/ {c++} END {print c+0}')"
+        WWD_COUNT="$(ls -ld "$rootdir" "$rootdir"/* 2>/dev/null | awk '$1 ~ /^d/ && $1 ~ /.......w./ {c++} END {print c+0}')"
+        EXEC_SCRIPT_COUNT="$(ls -l "$rootdir"/* 2>/dev/null | awk '/\.(php|phtml|jsp|jspx|asp|aspx|cgi|pl|py|sh)$/ && $1 ~ /x/ {c++} END {print c+0}')"
+        SUSP_NAME_COUNT="$(ls -1A "$rootdir" "$rootdir"/* 2>/dev/null | grep -Ei '(cmd|shell|wshell|wso|c99|r57|b374k|mini_shell|priv8|upload|uploader|mailer|backdoor)\.(php|phtml|php[0-9]?|jsp|jspx|asp|aspx|cgi|pl|py|sh)$' | wc -l | tr -d ' ')"
+        HIDDEN_COUNT="$(ls -1A "$rootdir" 2>/dev/null | grep '^\.' | wc -l | tr -d ' ')"
+        SUSP_CODE_COUNT="$(grep -RniE '(base64_decode\s*\(|eval\s*\(|assert\s*\(|shell_exec\s*\(|system\s*\(|passthru\s*\(|exec\s*\(|popen\s*\(|proc_open\s*\(|cmd\.exe|/bin/sh|powershell|gzinflate\s*\(|str_rot13\s*\(|preg_replace\s*\(.*\/e|create_function\s*\()' "$rootdir" 2>/dev/null | head -n 20 | wc -l | tr -d ' ')"
+
+        echo "  [+] world-writable files (shallow): $WWF_COUNT"
+        echo "  [+] world-writable directories (shallow): $WWD_COUNT"
+        echo "  [+] executable dynamic/script files (shallow): $EXEC_SCRIPT_COUNT"
+        echo "  [+] suspicious filenames: $SUSP_NAME_COUNT"
+        echo "  [+] suspicious code-string hits: $SUSP_CODE_COUNT"
+        echo "  [+] hidden files/directories in root: $HIDDEN_COUNT"
+
+        [ "$WWF_COUNT" -gt 0 ] && echo "  [!] World-writable files exist"
+        [ "$WWD_COUNT" -gt 0 ] && echo "  [!] World-writable directories exist"
+        [ "$EXEC_SCRIPT_COUNT" -gt 0 ] && echo "  [+] Executable server-side script files exist"
+        [ "$SUSP_NAME_COUNT" -gt 0 ] && echo "  [!] Suspicious webshell-like filenames exist"
+        [ "$SUSP_CODE_COUNT" -gt 0 ] && echo "  [!] Suspicious code patterns exist"
+        [ "$HIDDEN_COUNT" -gt 0 ] && echo "  [!] Hidden files/directories exist"
+    done
+    echo
 }
 
 service_config_paths() {
@@ -569,406 +1163,10 @@ service_config_paths() {
     esac
 }
 
-check_web_config_path() {
-    p="$1"
-    label="$2"
-
-    if [ -f "$p" ]; then
-        grep_service_files 'autoindex[[:space:]]+on|Options[[:space:]]+.*Indexes' "$p" | head -n 5 >/dev/null \
-            && echo "  [!] $label: directory listing reference present"
-        grep_service_files 'dav_methods|WebDAV|Dav[[:space:]]' "$p" | head -n 5 >/dev/null \
-            && echo "  [!] $label: WebDAV-related directive present"
-        grep_service_files 'php_admin_flag|php_value|php_flag|SetHandler.*php|location.*\.php|FilesMatch.*php' "$p" | head -n 5 >/dev/null \
-            && echo "  [+] $label: PHP handling reference present"
-        grep_service_files 'client_max_body_size[[:space:]]+[0-9]{2,}[mMgG]|LimitRequestBody[[:space:]]+[1-9][0-9]{7,}' "$p" | head -n 5 >/dev/null \
-            && echo "  [!] $label: large upload/body limit reference present"
-        grep_service_files 'proxy_pass|ProxyPass|fastcgi_pass|uwsgi_pass|scgi_pass|grpc_pass' "$p" | head -n 5 >/dev/null \
-            && echo "  [+] $label: reverse proxy/upstream reference present"
-    elif [ -d "$p" ]; then
-        found=0
-        for f in "$p"/*; do
-            [ -e "$f" ] || continue
-            [ -f "$f" ] || continue
-            check_web_config_path "$f" "$f"
-            found=1
-        done
-        [ "$found" -eq 0 ] && echo "  [+] $label: no regular files directly inside"
-    fi
-}
-
-check_service_config_findings() {
-    svc="$1"
-
-    echo "[+] $svc config findings"
-    paths="$(get_service_config_paths "$svc")"
-
-    if [ -z "$paths" ]; then
-        echo "  No default config locations found"
-        echo
-        return 0
-    fi
-
-    echo "$paths" | while read -r p; do
-        [ -n "$p" ] || continue
-        echo "--- $p"
-        check_web_config_path "$p" "$p"
-    done
-
-    echo
-}
-
-ssh_vuln_check() {
-    paths="$(service_config_paths ssh)"
-    out="$(
-        {
-            echo "[+] SSH findings"
-
-            grep_service_files '^[[:space:]]*PermitRootLogin[[:space:]]+yes([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] PermitRootLogin yes present"
-
-            grep_service_files '^[[:space:]]*PasswordAuthentication[[:space:]]+yes([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] PasswordAuthentication yes present"
-
-            grep_service_files '^[[:space:]]*PubkeyAuthentication[[:space:]]+no([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] PubkeyAuthentication no present"
-
-            grep_service_files '^[[:space:]]*PermitEmptyPasswords[[:space:]]+yes([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] PermitEmptyPasswords yes present"
-
-            grep_service_files '^[[:space:]]*MaxAuthTries[[:space:]]+([6-9]|[1-9][0-9]+)([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] High MaxAuthTries value present"
-
-            grep_service_files '^[[:space:]]*AllowUsers[[:space:]]+' $paths | head -n 5 >/dev/null \
-                && echo "  [+] AllowUsers restriction present"
-
-            grep_service_files '^[[:space:]]*AllowGroups[[:space:]]+' $paths | head -n 5 >/dev/null \
-                && echo "  [+] AllowGroups restriction present"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-vsftpd_vuln_check() {
-    paths="$(service_config_paths vsftpd)"
-    out="$(
-        {
-            echo "[+] vsftpd findings"
-
-            grep_service_files '^[[:space:]]*anonymous_enable[[:space:]]*=[[:space:]]*YES([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] anonymous_enable=YES present"
-
-            grep_service_files '^[[:space:]]*write_enable[[:space:]]*=[[:space:]]*YES([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] write_enable=YES present"
-
-            grep_service_files '^[[:space:]]*anon_upload_enable[[:space:]]*=[[:space:]]*YES([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] anon_upload_enable=YES present"
-
-            grep_service_files '^[[:space:]]*anon_mkdir_write_enable[[:space:]]*=[[:space:]]*YES([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] anon_mkdir_write_enable=YES present"
-
-            grep_service_files '^[[:space:]]*no_anon_password[[:space:]]*=[[:space:]]*YES([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] no_anon_password=YES present"
-
-            grep_service_files '^[[:space:]]*chroot_local_user[[:space:]]*=[[:space:]]*NO([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] chroot_local_user=NO present"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-proftpd_vuln_check() {
-    paths="$(service_config_paths proftpd)"
-    out="$(
-        {
-            echo "[+] ProFTPD findings"
-
-            grep_service_files '^[[:space:]]*<Anonymous[[:space:]]' $paths | head -n 5 \
-                && echo "  [!] Anonymous block present"
-
-            grep_service_files '^[[:space:]]*RequireValidShell[[:space:]]+off([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] RequireValidShell off present"
-
-            grep_service_files '^[[:space:]]*RootLogin[[:space:]]+on([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] RootLogin on present"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-pureftpd_vuln_check() {
-    out="$(
-        {
-            echo "[+] Pure-FTPd findings"
-
-            grep_service_files '^[[:space:]]*yes([[:space:]]|$)' /etc/pure-ftpd/conf/AnonymousOnly | head -n 5 \
-                && echo "  [!] AnonymousOnly enabled"
-
-            grep_service_files '^[[:space:]]*yes([[:space:]]|$)' /etc/pure-ftpd/conf/AnonymousCanCreateDirs | head -n 5 \
-                && echo "  [!] AnonymousCanCreateDirs enabled"
-
-            grep_service_files '^[[:space:]]*yes([[:space:]]|$)' /etc/pure-ftpd/conf/NoAnonymous | head -n 5 \
-                && echo "  [+] NoAnonymous enabled"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-tftp_vuln_check() {
-    paths="$(service_config_paths tftpd)"
-    out="$(
-        {
-            echo "[+] TFTP findings"
-
-            grep_service_files '(^|[[:space:]])--create([[:space:]]|$)|(^|[[:space:]])-c([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] TFTP create/upload option present"
-
-            grep_service_files '^[[:space:]]*disable[[:space:]]*=[[:space:]]*no([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [+] xinetd tftp service enabled"
-
-            grep_service_files '(^|[[:space:]])-s([[:space:]]|$)|(^|[[:space:]])--secure([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [+] TFTP secure root option present"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-apache_vuln_check() {
-    paths="$(service_config_paths apache)"
-    out="$(
-        {
-            echo "[+] Apache findings"
-
-            grep_service_files 'Options[[:space:]]+.*Indexes' $paths | head -n 5 \
-                && echo "  [!] Directory indexing enabled"
-
-            grep_service_files '^[[:space:]]*ServerTokens[[:space:]]+Full([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] ServerTokens Full present"
-
-            grep_service_files '^[[:space:]]*ServerSignature[[:space:]]+On([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] ServerSignature On present"
-
-            grep_service_files '^[[:space:]]*<Directory[[:space:]]+/?>' $paths | head -n 5 \
-                && echo "  [!] Broad root directory block present"
-
-            grep_service_files 'php_admin_flag|php_value|php_flag|SetHandler.*php|FilesMatch.*php' $paths | head -n 5 \
-                && echo "  [+] PHP handling reference present"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-nginx_vuln_check() {
-    paths="$(service_config_paths nginx)"
-    out="$(
-        {
-            echo "[+] Nginx findings"
-
-            grep_service_files '^[[:space:]]*autoindex[[:space:]]+on;?' $paths | head -n 5 \
-                && echo "  [!] autoindex on present"
-
-            grep_service_files '^[[:space:]]*dav_methods[[:space:]]' $paths | head -n 5 \
-                && echo "  [!] WebDAV methods enabled"
-
-            grep_service_files 'location[[:space:]]+~[[:space:]].*\.php|fastcgi_pass' $paths | head -n 5 \
-                && echo "  [+] PHP/FastCGI handling present"
-
-            grep_service_files '^[[:space:]]*client_max_body_size[[:space:]]+[0-9]{2,}[mMgG];?' $paths | head -n 5 \
-                && echo "  [!] Large upload size configured"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-mysql_vuln_check() {
-    paths="$(service_config_paths mysql)"
-    out="$(
-        {
-            echo "[+] MySQL/MariaDB findings"
-
-            grep_service_files '^[[:space:]]*bind-address[[:space:]]*=[[:space:]]*0\.0\.0\.0([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] bind-address=0.0.0.0 present"
-
-            grep_service_files '^[[:space:]]*skip-grant-tables([[:space:]]|$)|^[[:space:]]*skip-grant-tables[[:space:]]*=[[:space:]]*1([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] skip-grant-tables present"
-
-            grep_service_files '^[[:space:]]*local-infile[[:space:]]*=[[:space:]]*1([[:space:]]|$)|^[[:space:]]*local_infile[[:space:]]*=[[:space:]]*1([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] local-infile enabled"
-
-            grep_service_files '^[[:space:]]*skip-name-resolve([[:space:]]|$)|^[[:space:]]*skip_name_resolve([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [+] skip-name-resolve present"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-postgres_vuln_check() {
-    paths="$(service_config_paths postgres)"
-    out="$(
-        {
-            echo "[+] PostgreSQL findings"
-
-            for p in $paths; do
-                if [ -f "$p/pg_hba.conf" ]; then
-                    grep_service_files '^[[:space:]]*host[[:space:]]+all[[:space:]]+all[[:space:]]+0\.0\.0\.0/0[[:space:]]+(trust|md5|password)' "$p/pg_hba.conf" | head -n 5 \
-                        && echo "  [!] Broad 0.0.0.0/0 host rule present"
-                    grep_service_files '^[[:space:]]*local[[:space:]]+all[[:space:]]+all[[:space:]]+trust([[:space:]]|$)' "$p/pg_hba.conf" | head -n 5 \
-                        && echo "  [!] local trust authentication present"
-                fi
-                if [ -f "$p/postgresql.conf" ]; then
-                    grep_service_files "^[[:space:]]*listen_addresses[[:space:]]*=[[:space:]]*'\\*'" "$p/postgresql.conf" | head -n 5 \
-                        && echo "  [!] listen_addresses='*' present"
-                fi
-            done
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-php_vuln_check() {
-    paths="$(service_config_paths php)"
-    out="$(
-        {
-            echo "[+] PHP findings"
-
-            grep_service_files '^[[:space:]]*display_errors[[:space:]]*=[[:space:]]*On([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] display_errors=On present"
-
-            grep_service_files '^[[:space:]]*allow_url_include[[:space:]]*=[[:space:]]*On([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] allow_url_include=On present"
-
-            grep_service_files '^[[:space:]]*allow_url_fopen[[:space:]]*=[[:space:]]*On([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [+] allow_url_fopen=On present"
-
-            grep_service_files '^[[:space:]]*expose_php[[:space:]]*=[[:space:]]*On([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] expose_php=On present"
-
-            grep_service_files '^[[:space:]]*disable_functions[[:space:]]*=' $paths | head -n 5 \
-                && echo "  [+] disable_functions configured"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-smb_vuln_check() {
-    paths="$(service_config_paths smbd)"
-    out="$(
-        {
-            echo "[+] Samba findings"
-
-            grep_service_files '^[[:space:]]*map[[:space:]]+to[[:space:]]+guest[[:space:]]*=[[:space:]]*Bad User' $paths | head -n 5 \
-                && echo "  [!] map to guest = Bad User present"
-
-            grep_service_files '^[[:space:]]*guest[[:space:]]+ok[[:space:]]*=[[:space:]]*yes' $paths | head -n 5 \
-                && echo "  [!] guest ok = yes present"
-
-            grep_service_files '^[[:space:]]*guest[[:space:]]+only[[:space:]]*=[[:space:]]*yes' $paths | head -n 5 \
-                && echo "  [!] guest only = yes present"
-
-            grep_service_files '^[[:space:]]*writable[[:space:]]*=[[:space:]]*yes|^[[:space:]]*write[[:space:]]+ok[[:space:]]*=[[:space:]]*yes' $paths | head -n 5 \
-                && echo "  [!] Writable share setting present"
-
-            grep_service_files '^[[:space:]]*browseable[[:space:]]*=[[:space:]]*yes' $paths | head -n 5 \
-                && echo "  [+] browseable shares present"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-snmp_vuln_check() {
-    paths="$(service_config_paths snmpd)"
-    out="$(
-        {
-            echo "[+] SNMP findings"
-
-            grep_service_files '^[[:space:]]*rocommunity[[:space:]]+public([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] rocommunity public present"
-
-            grep_service_files '^[[:space:]]*rwcommunity[[:space:]]+' $paths | head -n 5 \
-                && echo "  [!] rwcommunity present"
-
-            grep_service_files '^[[:space:]]*rocommunity6[[:space:]]+public([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] rocommunity6 public present"
-
-            grep_service_files '^[[:space:]]*agentAddress[[:space:]].*0\.0\.0\.0' $paths | head -n 5 \
-                && echo "  [!] agentAddress bound broadly"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-squid_vuln_check() {
-    paths="$(service_config_paths squid)"
-    out="$(
-        {
-            echo "[+] Squid findings"
-
-            grep_service_files '^[[:space:]]*http_access[[:space:]]+allow[[:space:]]+all([[:space:]]|$)' $paths | head -n 5 \
-                && echo "  [!] http_access allow all present"
-
-            grep_service_files '^[[:space:]]*acl[[:space:]]+localnet[[:space:]]+src[[:space:]]+0\.0\.0\.0/0' $paths | head -n 5 \
-                && echo "  [!] localnet defined as 0.0.0.0/0"
-
-            grep_service_files '^[[:space:]]*http_port[[:space:]]+[0-9]+' $paths | head -n 5 \
-                && echo "  [+] Squid http_port configured"
-        } 2>/dev/null
-    )"
-
-    [ -n "$out" ] && echo "$out"
-}
-
-telnet_vuln_check() {
-    out="$(
-        {
-            echo "[+] Telnet findings"
-            echo "  [!] Telnet service detected"
-        } 2>/dev/null
-    )"
-    [ -n "$out" ] && echo "$out"
-}
-
-cockpit_vuln_check() {
-    paths="$(service_config_paths cockpit)"
-    out="$(
-        {
-            echo "[+] Cockpit findings"
-            echo "  [!] Cockpit service detected"
-
-            grep_service_files '^[[:space:]]*AllowUnencrypted[[:space:]]*=[[:space:]]*true' $paths | head -n 5 \
-                && echo "  [!] AllowUnencrypted=true present"
-        } 2>/dev/null
-    )"
-    [ -n "$out" ] && echo "$out"
-}
-
-xinetd_vuln_check() {
-    out="$(
-        {
-            echo "[+] xinetd findings"
-            [ -d /etc/xinetd.d ] && echo "  [+] /etc/xinetd.d present"
-
-            grep_service_files '^[[:space:]]*disable[[:space:]]*=[[:space:]]*no([[:space:]]|$)' /etc/xinetd.d | head -n 10 \
-                && echo "  [!] Enabled xinetd service entries present"
-        } 2>/dev/null
-    )"
-    [ -n "$out" ] && echo "$out"
-}
-
 service_vuln_inventory() {
     SERVICES="$1"
 
-    print_section "SERVICE MISCONFIG FINDINGS"
+    print_section "SERVICE MISCONFIG / WEB FINDINGS"
 
     VULN_OUT="$(
         {
@@ -988,15 +1186,25 @@ service_vuln_inventory() {
             checkService "$SERVICES" "telnet" "" >/dev/null 2>&1 && telnet_vuln_check
             checkService "$SERVICES" "cockpit" "" >/dev/null 2>&1 && cockpit_vuln_check
             { checkService "$SERVICES" "xinetd" "" >/dev/null 2>&1 || checkService "$SERVICES" "inetd" "" >/dev/null 2>&1; } && xinetd_vuln_check
+
+            if checkService "$SERVICES" "apache2" "" >/dev/null 2>&1 || \
+               checkService "$SERVICES" "httpd" "" >/dev/null 2>&1 || \
+               checkService "$SERVICES" "nginx" "" >/dev/null 2>&1 || \
+               checkService "$SERVICES" "lighttpd" "" >/dev/null 2>&1 || \
+               checkService "$SERVICES" "caddy" "" >/dev/null 2>&1; then
+                web_root_review
+            fi
         } 2>/dev/null
     )"
 
     if [ -n "$VULN_OUT" ]; then
         echo "$VULN_OUT"
         write_text_file "$ENUM_ROOT/service_misconfigs.txt" "$VULN_OUT"
+        write_text_file "$ENUM_ROOT/web_review.txt" "$VULN_OUT"
     else
-        echo "No common service misconfig findings from enabled checks"
-        write_text_file "$ENUM_ROOT/service_misconfigs.txt" "No common service misconfig findings from enabled checks"
+        echo "No common service/web misconfig findings from enabled checks"
+        write_text_file "$ENUM_ROOT/service_misconfigs.txt" "No common service/web misconfig findings from enabled checks"
+        write_text_file "$ENUM_ROOT/web_review.txt" "No common service/web misconfig findings from enabled checks"
     fi
 }
 
@@ -1016,11 +1224,11 @@ mysql_inventory() {
                     [ -n "$p" ] || continue
                     echo "--- $p"
                     if [ -f "$p" ]; then
-                        grep_service_files '^[[:space:]]*(bind-address|port|socket|user|skip-networking|skip-name-resolve|skip-grant-tables|local-infile|local_infile)' "$p" | head -n 20
+                        grep_service_files '(bind-address|port|socket|user|skip-networking|skip-name-resolve|skip-grant-tables|local-infile|local_infile)' "$p" | head -n 20
                     elif [ -d "$p" ]; then
                         for f in "$p"/*; do
                             [ -f "$f" ] || continue
-                            grep_service_files '^[[:space:]]*(bind-address|port|socket|user|skip-networking|skip-name-resolve|skip-grant-tables|local-infile|local_infile)' "$f" | head -n 10
+                            grep_service_files '(bind-address|port|socket|user|skip-networking|skip-name-resolve|skip-grant-tables|local-infile|local_infile)' "$f" | head -n 10
                         done
                     fi
                 done
@@ -1052,9 +1260,9 @@ postgres_inventory() {
                     echo "--- $p"
 
                     if [ -f "$p/pg_hba.conf" ]; then
-                        awk '!/^[[:space:]]*#/ && !/^[[:space:]]*$/' "$p/pg_hba.conf" 2>/dev/null | grep -E 'local|host' | head -n 20
+                        grep -nEv '^[[:space:]]*#|^[[:space:]]*$' "$p/pg_hba.conf" 2>/dev/null | grep -E 'local|host' | head -n 20
                     elif [ -f "$p" ] && [ "$(basename "$p")" = "pg_hba.conf" ]; then
-                        awk '!/^[[:space:]]*#/ && !/^[[:space:]]*$/' "$p" 2>/dev/null | grep -E 'local|host' | head -n 20
+                        grep -nEv '^[[:space:]]*#|^[[:space:]]*$' "$p" 2>/dev/null | grep -E 'local|host' | head -n 20
                     else
                         ls -1 "$p" 2>/dev/null | grep -E 'pg_hba\.conf|postgresql\.conf' | sed "s#^#  [+] #"
                     fi
@@ -1068,103 +1276,6 @@ postgres_inventory() {
     else
         write_text_file "$ENUM_ROOT/postgresql.txt" "postgres not detected"
     fi
-}
-
-check_web_permissions_fast() {
-    echo "[+] Web root permission findings"
-
-    get_web_root_candidates | while read -r rootdir; do
-        [ -d "$rootdir" ] || continue
-        echo "--- $rootdir"
-
-        WWF_COUNT="$(ls -ld "$rootdir" "$rootdir"/* 2>/dev/null | awk '$1 ~ /.......w./ && $1 !~ /^d/ {c++} END {print c+0}')"
-        WWD_COUNT="$(ls -ld "$rootdir" "$rootdir"/* 2>/dev/null | awk '$1 ~ /^d/ && $1 ~ /.......w./ {c++} END {print c+0}')"
-        EXEC_SCRIPT_COUNT="$(ls -l "$rootdir"/* 2>/dev/null | awk '/\.(php|phtml|jsp|jspx|asp|aspx|cgi|pl|py|sh)$/ && $1 ~ /x/ {c++} END {print c+0}')"
-
-        echo "  [+] world-writable files (shallow): $WWF_COUNT"
-        echo "  [+] world-writable directories (shallow): $WWD_COUNT"
-        echo "  [+] executable dynamic/script files (shallow): $EXEC_SCRIPT_COUNT"
-
-        [ "$WWF_COUNT" -gt 0 ] && echo "  [!] World-writable files exist"
-        [ "$WWD_COUNT" -gt 0 ] && echo "  [!] World-writable directories exist"
-        [ "$EXEC_SCRIPT_COUNT" -gt 0 ] && echo "  [+] Executable server-side script files exist"
-    done
-
-    echo
-}
-
-check_webshell_indicators_fast() {
-    echo "[+] Webshell indicator findings"
-    echo "[!] Heuristic only"
-
-    get_web_root_candidates | while read -r rootdir; do
-        [ -d "$rootdir" ] || continue
-        echo "--- $rootdir"
-
-        SUSP_NAME_COUNT="$(ls -1A "$rootdir" "$rootdir"/* 2>/dev/null | grep -Ei '(cmd|shell|wshell|wso|c99|r57|b374k|mini_shell|priv8|upload|uploader|mailer|backdoor)\.(php|phtml|php[0-9]?|jsp|jspx|asp|aspx|cgi|pl|py|sh)$' | wc -l | tr -d ' ')"
-        HIDDEN_COUNT="$(ls -1A "$rootdir" 2>/dev/null | grep '^\.' | wc -l | tr -d ' ')"
-        SUSP_CODE_COUNT="$(grep -RniE '(base64_decode\s*\(|eval\s*\(|assert\s*\(|shell_exec\s*\(|system\s*\(|passthru\s*\(|exec\s*\(|popen\s*\(|proc_open\s*\(|cmd\.exe|/bin/sh|powershell|gzinflate\s*\(|str_rot13\s*\(|preg_replace\s*\(.*\/e|create_function\s*\()' "$rootdir" 2>/dev/null | head -n 20 | wc -l | tr -d ' ')"
-
-        echo "  [+] suspicious filenames: $SUSP_NAME_COUNT"
-        echo "  [+] suspicious code-string hits: $SUSP_CODE_COUNT"
-        echo "  [+] hidden files/directories in root: $HIDDEN_COUNT"
-
-        [ "$SUSP_NAME_COUNT" -gt 0 ] && echo "  [!] Suspicious webshell-like filenames exist"
-        [ "$SUSP_CODE_COUNT" -gt 0 ] && echo "  [!] Suspicious code patterns exist"
-        [ "$HIDDEN_COUNT" -gt 0 ] && echo "  [!] Hidden files/directories exist"
-    done
-
-    echo
-}
-
-web_server_inventory() {
-    SERVICES="$1"
-    found_web=false
-
-    if checkService "$SERVICES" "apache2" "" >/dev/null 2>&1 || \
-       checkService "$SERVICES" "httpd" "" >/dev/null 2>&1 || \
-       checkService "$SERVICES" "nginx" "" >/dev/null 2>&1 || \
-       checkService "$SERVICES" "lighttpd" "" >/dev/null 2>&1 || \
-       checkService "$SERVICES" "caddy" "" >/dev/null 2>&1; then
-        found_web=true
-    fi
-
-    if [ "$found_web" != true ]; then
-        write_text_file "$ENUM_ROOT/web_review.txt" "No supported web server detected"
-        return 0
-    fi
-
-    print_section "WEB SERVER REVIEW"
-
-    WEB_OUT="$(
-        {
-            if checkService "$SERVICES" "apache2" "" >/dev/null 2>&1 || checkService "$SERVICES" "httpd" "" >/dev/null 2>&1; then
-                print_service_config_locations apache
-                check_service_config_findings apache
-            fi
-
-            if checkService "$SERVICES" "nginx" "" >/dev/null 2>&1; then
-                print_service_config_locations nginx
-                check_service_config_findings nginx
-            fi
-
-            if checkService "$SERVICES" "lighttpd" "" >/dev/null 2>&1; then
-                print_service_config_locations lighttpd
-                check_service_config_findings lighttpd
-            fi
-
-            if checkService "$SERVICES" "caddy" "" >/dev/null 2>&1; then
-                print_service_config_locations caddy
-                check_service_config_findings caddy
-            fi
-
-            check_web_permissions_fast
-            check_webshell_indicators_fast
-        } 2>/dev/null
-    )"
-
-    echo "$WEB_OUT"
-    write_text_file "$ENUM_ROOT/web_review.txt" "$WEB_OUT"
 }
 
 main_inventory() {
@@ -1241,7 +1352,6 @@ main_inventory() {
     mysql_inventory "$SERVICES"
     postgres_inventory "$SERVICES"
     kubernetes_inventory
-    web_server_inventory "$SERVICES"
 
     echo "[+] Backup directory root"
     echo "$BACKUP_ROOT"
