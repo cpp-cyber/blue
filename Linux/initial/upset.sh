@@ -1,5 +1,5 @@
 #!/bin/sh
-# @d_tranman/Nigel Gerald/Nigerald's inventory but with extra steps - adam
+# @d_tranman/Nigel Gerald/Nigerald's inventory script with extra steps - adam
 
 IS_RHEL=false
 IS_DEBIAN=false
@@ -431,8 +431,8 @@ get_squid_config_paths() {
 get_cockpit_config_paths() {
     out=""
     [ -d /etc/cockpit ] && out="$(append_if_exists "$out" /etc/cockpit)"
-    [ -d /usr/lib/systemd/system ] && out="$(append_if_exists "$out" /usr/lib/systemd/system/cockpit.socket)"
-    [ -d /etc/systemd/system ] && out="$(append_if_exists "$out" /etc/systemd/system/cockpit.socket.d)"
+    [ -f /usr/lib/systemd/system/cockpit.socket ] && out="$(append_if_exists "$out" /usr/lib/systemd/system/cockpit.socket)"
+    [ -d /etc/systemd/system/cockpit.socket.d ] && out="$(append_if_exists "$out" /etc/systemd/system/cockpit.socket.d)"
     printf '%s\n' "$out" | awk 'NF' | sort -u
 }
 
@@ -486,6 +486,8 @@ print_service_config_locations() {
     echo
 }
 
+# Comment-aware config matcher.
+# Outputs matching lines from active, uncommented config entries only.
 grep_service_files() {
     pattern="$1"
     shift
@@ -494,11 +496,19 @@ grep_service_files() {
         [ -e "$p" ] || continue
 
         if [ -f "$p" ]; then
-            grep -HinE "$pattern" "$p" 2>/dev/null
+            awk -v pat="$pattern" '
+                /^[[:space:]]*#/ { next }
+                /^[[:space:]]*$/ { next }
+                $0 ~ pat { print FILENAME ":" FNR ":" $0 }
+            ' "$p" 2>/dev/null
         elif [ -d "$p" ]; then
             for f in "$p"/*; do
                 [ -f "$f" ] || continue
-                grep -HinE "$pattern" "$f" 2>/dev/null
+                awk -v pat="$pattern" '
+                    /^[[:space:]]*#/ { next }
+                    /^[[:space:]]*$/ { next }
+                    $0 ~ pat { print FILENAME ":" FNR ":" $0 }
+                ' "$f" 2>/dev/null
             done
         fi
     done
@@ -564,11 +574,16 @@ check_web_config_path() {
     label="$2"
 
     if [ -f "$p" ]; then
-        grep -qiE 'autoindex\s+on|Options\s+Indexes' "$p" 2>/dev/null && echo "  [!] $label: directory listing reference present"
-        grep -qiE 'dav_methods|WebDAV|Dav\s' "$p" 2>/dev/null && echo "  [!] $label: WebDAV-related directive present"
-        grep -qiE 'php_admin_flag|php_value|php_flag|SetHandler.*php|location.*\.php|FilesMatch.*php' "$p" 2>/dev/null && echo "  [+] $label: PHP handling reference present"
-        grep -qiE 'client_max_body_size\s+[0-9]{2,}[mMgG]|LimitRequestBody\s+[1-9][0-9]{7,}' "$p" 2>/dev/null && echo "  [!] $label: large upload/body limit reference present"
-        grep -qiE 'proxy_pass|ProxyPass|fastcgi_pass|uwsgi_pass|scgi_pass|grpc_pass' "$p" 2>/dev/null && echo "  [+] $label: reverse proxy/upstream reference present"
+        grep_service_files 'autoindex[[:space:]]+on|Options[[:space:]]+.*Indexes' "$p" | head -n 5 >/dev/null \
+            && echo "  [!] $label: directory listing reference present"
+        grep_service_files 'dav_methods|WebDAV|Dav[[:space:]]' "$p" | head -n 5 >/dev/null \
+            && echo "  [!] $label: WebDAV-related directive present"
+        grep_service_files 'php_admin_flag|php_value|php_flag|SetHandler.*php|location.*\.php|FilesMatch.*php' "$p" | head -n 5 >/dev/null \
+            && echo "  [+] $label: PHP handling reference present"
+        grep_service_files 'client_max_body_size[[:space:]]+[0-9]{2,}[mMgG]|LimitRequestBody[[:space:]]+[1-9][0-9]{7,}' "$p" | head -n 5 >/dev/null \
+            && echo "  [!] $label: large upload/body limit reference present"
+        grep_service_files 'proxy_pass|ProxyPass|fastcgi_pass|uwsgi_pass|scgi_pass|grpc_pass' "$p" | head -n 5 >/dev/null \
+            && echo "  [+] $label: reverse proxy/upstream reference present"
     elif [ -d "$p" ]; then
         found=0
         for f in "$p"/*; do
@@ -620,13 +635,13 @@ ssh_vuln_check() {
             grep_service_files '^[[:space:]]*PermitEmptyPasswords[[:space:]]+yes([[:space:]]|$)' $paths | head -n 5 \
                 && echo "  [!] PermitEmptyPasswords yes present"
 
-            grep_service_files '^[[:space:]]*MaxAuthTries[[:space:]]+[6-9]|^[[:space:]]*MaxAuthTries[[:space:]]+[1-9][0-9]+' $paths | head -n 5 \
+            grep_service_files '^[[:space:]]*MaxAuthTries[[:space:]]+([6-9]|[1-9][0-9]+)([[:space:]]|$)' $paths | head -n 5 \
                 && echo "  [!] High MaxAuthTries value present"
 
-            grep_service_files '^[[:space:]]*AllowUsers[[:space:]]+' $paths | head -n 5 \
+            grep_service_files '^[[:space:]]*AllowUsers[[:space:]]+' $paths | head -n 5 >/dev/null \
                 && echo "  [+] AllowUsers restriction present"
 
-            grep_service_files '^[[:space:]]*AllowGroups[[:space:]]+' $paths | head -n 5 \
+            grep_service_files '^[[:space:]]*AllowGroups[[:space:]]+' $paths | head -n 5 >/dev/null \
                 && echo "  [+] AllowGroups restriction present"
         } 2>/dev/null
     )"
@@ -688,13 +703,13 @@ pureftpd_vuln_check() {
         {
             echo "[+] Pure-FTPd findings"
 
-            grep_service_files '^[[:space:]]*yes([[:space:]]|$)' /etc/pure-ftpd/conf/AnonymousOnly 2>/dev/null | head -n 5 \
+            grep_service_files '^[[:space:]]*yes([[:space:]]|$)' /etc/pure-ftpd/conf/AnonymousOnly | head -n 5 \
                 && echo "  [!] AnonymousOnly enabled"
 
-            grep_service_files '^[[:space:]]*yes([[:space:]]|$)' /etc/pure-ftpd/conf/AnonymousCanCreateDirs 2>/dev/null | head -n 5 \
+            grep_service_files '^[[:space:]]*yes([[:space:]]|$)' /etc/pure-ftpd/conf/AnonymousCanCreateDirs | head -n 5 \
                 && echo "  [!] AnonymousCanCreateDirs enabled"
 
-            grep_service_files '^[[:space:]]*yes([[:space:]]|$)' /etc/pure-ftpd/conf/NoAnonymous 2>/dev/null | head -n 5 \
+            grep_service_files '^[[:space:]]*yes([[:space:]]|$)' /etc/pure-ftpd/conf/NoAnonymous | head -n 5 \
                 && echo "  [+] NoAnonymous enabled"
         } 2>/dev/null
     )"
@@ -777,8 +792,6 @@ mysql_vuln_check() {
         {
             echo "[+] MySQL/MariaDB findings"
 
-            grep_service_files '^[[:space:]]*skip-networking[[:space:]]*=?[[:space:]]*0?([[:space:]]|$)' $paths | head -n 5 >/dev/null
-
             grep_service_files '^[[:space:]]*bind-address[[:space:]]*=[[:space:]]*0\.0\.0\.0([[:space:]]|$)' $paths | head -n 5 \
                 && echo "  [!] bind-address=0.0.0.0 present"
 
@@ -804,13 +817,13 @@ postgres_vuln_check() {
 
             for p in $paths; do
                 if [ -f "$p/pg_hba.conf" ]; then
-                    grep -HinE '^[[:space:]]*host[[:space:]]+all[[:space:]]+all[[:space:]]+0\.0\.0\.0/0[[:space:]]+(trust|md5|password)' "$p/pg_hba.conf" 2>/dev/null | head -n 5 \
+                    grep_service_files '^[[:space:]]*host[[:space:]]+all[[:space:]]+all[[:space:]]+0\.0\.0\.0/0[[:space:]]+(trust|md5|password)' "$p/pg_hba.conf" | head -n 5 \
                         && echo "  [!] Broad 0.0.0.0/0 host rule present"
-                    grep -HinE '^[[:space:]]*local[[:space:]]+all[[:space:]]+all[[:space:]]+trust([[:space:]]|$)' "$p/pg_hba.conf" 2>/dev/null | head -n 5 \
+                    grep_service_files '^[[:space:]]*local[[:space:]]+all[[:space:]]+all[[:space:]]+trust([[:space:]]|$)' "$p/pg_hba.conf" | head -n 5 \
                         && echo "  [!] local trust authentication present"
                 fi
                 if [ -f "$p/postgresql.conf" ]; then
-                    grep -HinE '^[[:space:]]*listen_addresses[[:space:]]*=[[:space:]]*'\''\*'\''' "$p/postgresql.conf" 2>/dev/null | head -n 5 \
+                    grep_service_files "^[[:space:]]*listen_addresses[[:space:]]*=[[:space:]]*'\\*'" "$p/postgresql.conf" | head -n 5 \
                         && echo "  [!] listen_addresses='*' present"
                 fi
             done
@@ -945,7 +958,7 @@ xinetd_vuln_check() {
             echo "[+] xinetd findings"
             [ -d /etc/xinetd.d ] && echo "  [+] /etc/xinetd.d present"
 
-            grep_service_files '^[[:space:]]*disable[[:space:]]*=[[:space:]]*no([[:space:]]|$)' /etc/xinetd.d 2>/dev/null | head -n 10 \
+            grep_service_files '^[[:space:]]*disable[[:space:]]*=[[:space:]]*no([[:space:]]|$)' /etc/xinetd.d | head -n 10 \
                 && echo "  [!] Enabled xinetd service entries present"
         } 2>/dev/null
     )"
@@ -1003,11 +1016,11 @@ mysql_inventory() {
                     [ -n "$p" ] || continue
                     echo "--- $p"
                     if [ -f "$p" ]; then
-                        grep -HiE '^\s*(bind-address|port|socket|user|skip-networking|skip-name-resolve|skip-grant-tables|local-infile|local_infile)' "$p" 2>/dev/null | head -n 20
+                        grep_service_files '^[[:space:]]*(bind-address|port|socket|user|skip-networking|skip-name-resolve|skip-grant-tables|local-infile|local_infile)' "$p" | head -n 20
                     elif [ -d "$p" ]; then
                         for f in "$p"/*; do
                             [ -f "$f" ] || continue
-                            grep -HiE '^\s*(bind-address|port|socket|user|skip-networking|skip-name-resolve|skip-grant-tables|local-infile|local_infile)' "$f" 2>/dev/null | head -n 10
+                            grep_service_files '^[[:space:]]*(bind-address|port|socket|user|skip-networking|skip-name-resolve|skip-grant-tables|local-infile|local_infile)' "$f" | head -n 10
                         done
                     fi
                 done
@@ -1039,9 +1052,9 @@ postgres_inventory() {
                     echo "--- $p"
 
                     if [ -f "$p/pg_hba.conf" ]; then
-                        grep -Ev '^\s*#|^\s*$' "$p/pg_hba.conf" 2>/dev/null | grep -E 'local|host' | head -n 20
+                        awk '!/^[[:space:]]*#/ && !/^[[:space:]]*$/' "$p/pg_hba.conf" 2>/dev/null | grep -E 'local|host' | head -n 20
                     elif [ -f "$p" ] && [ "$(basename "$p")" = "pg_hba.conf" ]; then
-                        grep -Ev '^\s*#|^\s*$' "$p" 2>/dev/null | grep -E 'local|host' | head -n 20
+                        awk '!/^[[:space:]]*#/ && !/^[[:space:]]*$/' "$p" 2>/dev/null | grep -E 'local|host' | head -n 20
                     else
                         ls -1 "$p" 2>/dev/null | grep -E 'pg_hba\.conf|postgresql\.conf' | sed "s#^#  [+] #"
                     fi
