@@ -19,7 +19,7 @@ $BackupDir  = "C:\CCDC\Scripts\Backup"
 if (-not (Test-Path $ScriptsDir)) { New-Item -ItemType Directory -Path $ScriptsDir -Force | Out-Null }
 if (-not (Test-Path $BackupDir))  { New-Item -ItemType Directory -Path $BackupDir -Force | Out-Null }
 
-$BaseUrl = "https://raw.githubusercontent.com/nosodium/yesodium/refs/heads/main"
+$BaseUrl = "https://raw.githubusercontent.com/cpp-cyber/blue/refs/heads/main/nosodium/"
 $ScriptList = @(
     "inv.ps1",
     "deps.ps1",
