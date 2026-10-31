@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    CCDC Master Blue Team Deployment & Orchestration Engine (v3 - Priority Reorder)
+    CCDC Master Blue Team Deployment & Orchestration Engine (v4 - UserMgmt Integrated)
 .DESCRIPTION
     Smart local caching. Only downloads on first run or when [R] is pressed.
-    Organized strictly by operational priority (deps.ps1 before pw.ps1).
+    Organized strictly by operational priority.
     Creates C:\menu.bat for instant re-opening. Pure ASCII.
 #>
 
@@ -24,6 +24,7 @@ $ScriptList = @(
     "inv.ps1",
     "deps.ps1",
     "pw.ps1",
+    "usermgmt.ps1",
     "fw.ps1",
     "harden.ps1",
     "secpol.ps1",
@@ -36,8 +37,11 @@ function Sync-ScriptsFromGitHub {
     Write-Output "`n[*] Synchronizing scripts from GitHub repository..."
     $webClient = New-Object System.Net.WebClient
 
+    # Safely trim trailing slash for clean URL concatenation
+    $cleanBase = $BaseUrl.TrimEnd('/')
+
     foreach ($scriptName in $ScriptList) {
-        $sourceUrl = $BaseUrl + "/" + $scriptName + "?nocache=" + (Get-Random)
+        $sourceUrl = $cleanBase + "/" + $scriptName + "?nocache=" + (Get-Random)
         $destPath  = Join-Path -Path $ScriptsDir -ChildPath $scriptName
         $bakPath   = Join-Path -Path $BackupDir -ChildPath $scriptName
 
@@ -79,34 +83,36 @@ while ($true) {
     Write-Output "`n========================================================"
     Write-Output "        CCDC DEFENSIVE OPERATIONS MENU (BY PRIORITY)    "
     Write-Output "========================================================"
-    Write-Output "[1] PRIORITY 1: Inventory & Baseline        (inv.ps1)"
-    Write-Output "[2] PRIORITY 2: Service Accounts & SSO Map  (deps.ps1)"
-    Write-Output "[3] PRIORITY 3: Credential Rotation         (pw.ps1)"
-    Write-Output "[4] PRIORITY 4: Firewall & Port Lockdown    (fw.ps1)"
-    Write-Output "[5] PRIORITY 5: AD & Exploit Hardening      (harden.ps1)"
-    Write-Output "[6] PRIORITY 6: Host Policies & Telemetry   (secpol.ps1)"
-    Write-Output "[7] PRIORITY 7: Post-Hardening Verification (auditpost.ps1)"
+    Write-Output "[1]  PRIORITY 1: Inventory & Baseline        (inv.ps1)"
+    Write-Output "[2]  PRIORITY 2: Service Accounts & SSO Map  (deps.ps1)"
+    Write-Output "[3]  PRIORITY 3: Credential Rotation         (pw.ps1)"
+    Write-Output "[4]  PRIORITY 4: User Mgmt & Role Lockdown   (usermgmt.ps1)"
+    Write-Output "[5]  PRIORITY 5: Firewall & Port Lockdown    (fw.ps1)"
+    Write-Output "[6]  PRIORITY 6: AD & Exploit Hardening      (harden.ps1)"
+    Write-Output "[7]  PRIORITY 7: Host Policies & Telemetry   (secpol.ps1)"
+    Write-Output "[8]  PRIORITY 8: Post-Hardening Verification (auditpost.ps1)"
     Write-Output "--------------------------------------------------------"
-    Write-Output "[8] UTILITY: Download Sysinternals Suite    (tools.ps1)"
-    Write-Output "[9] UTILITY: Threat Hunting Engine          (thrunt.ps1)"
-    Write-Output "[R] RE-SYNC: Force Refresh All Scripts from GitHub"
-    Write-Output "[Q] QUIT"
+    Write-Output "[9]  UTILITY: Download Sysinternals Suite    (tools.ps1)"
+    Write-Output "[10] UTILITY: Threat Hunting Engine          (thrunt.ps1)"
+    Write-Output "[R]  RE-SYNC: Force Refresh All Scripts from GitHub"
+    Write-Output "[Q]  QUIT"
     Write-Output "--------------------------------------------------------"
 
-    $choice = Read-Host "Select a priority phase to execute [1-9, R, Q]"
+    $choice = Read-Host "Select a priority phase to execute [1-10, R, Q]"
 
     switch ($choice.ToUpper()) {
-        "1" { if (Test-Path "$ScriptsDir\inv.ps1") { & "$ScriptsDir\inv.ps1" } }
-        "2" { if (Test-Path "$ScriptsDir\deps.ps1") { & "$ScriptsDir\deps.ps1" } }
-        "3" { if (Test-Path "$ScriptsDir\pw.ps1") { & "$ScriptsDir\pw.ps1" } }
-        "4" { if (Test-Path "$ScriptsDir\fw.ps1") { & "$ScriptsDir\fw.ps1" } }
-        "5" { if (Test-Path "$ScriptsDir\harden.ps1") { & "$ScriptsDir\harden.ps1" } }
-        "6" { if (Test-Path "$ScriptsDir\secpol.ps1") { & "$ScriptsDir\secpol.ps1" } }
-        "7" { if (Test-Path "$ScriptsDir\auditpost.ps1") { & "$ScriptsDir\auditpost.ps1" } }
-        "8" { if (Test-Path "$ScriptsDir\tools.ps1") { & "$ScriptsDir\tools.ps1" } }
-        "9" { if (Test-Path "$ScriptsDir\thrunt.ps1") { & "$ScriptsDir\thrunt.ps1" } }
-        "R" { Sync-ScriptsFromGitHub }
-        "Q" { Write-Output "Exiting menu. To reopen anytime, run: C:\menu.bat or & C:\CCDC\Scripts\setup.ps1"; return }
-        Default { Write-Output "[!] Invalid selection. Please enter 1-9, R, or Q." }
+        "1"  { if (Test-Path "$ScriptsDir\inv.ps1") { & "$ScriptsDir\inv.ps1" } }
+        "2"  { if (Test-Path "$ScriptsDir\deps.ps1") { & "$ScriptsDir\deps.ps1" } }
+        "3"  { if (Test-Path "$ScriptsDir\pw.ps1") { & "$ScriptsDir\pw.ps1" } }
+        "4"  { if (Test-Path "$ScriptsDir\usermgmt.ps1") { & "$ScriptsDir\usermgmt.ps1" } }
+        "5"  { if (Test-Path "$ScriptsDir\fw.ps1") { & "$ScriptsDir\fw.ps1" } }
+        "6"  { if (Test-Path "$ScriptsDir\harden.ps1") { & "$ScriptsDir\harden.ps1" } }
+        "7"  { if (Test-Path "$ScriptsDir\secpol.ps1") { & "$ScriptsDir\secpol.ps1" } }
+        "8"  { if (Test-Path "$ScriptsDir\auditpost.ps1") { & "$ScriptsDir\auditpost.ps1" } }
+        "9"  { if (Test-Path "$ScriptsDir\tools.ps1") { & "$ScriptsDir\tools.ps1" } }
+        "10" { if (Test-Path "$ScriptsDir\thrunt.ps1") { & "$ScriptsDir\thrunt.ps1" } }
+        "R"  { Sync-ScriptsFromGitHub }
+        "Q"  { Write-Output "Exiting menu. To reopen anytime, run: C:\menu.bat or & C:\CCDC\Scripts\setup.ps1"; return }
+        Default { Write-Output "[!] Invalid selection. Please enter 1-10, R, or Q." }
     }
 }
