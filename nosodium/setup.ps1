@@ -30,7 +30,9 @@ $ScriptList = @(
     "secpol.ps1",
     "auditpost.ps1",
     "tools.ps1",
-    "thrunt.ps1"
+    "thrunt.ps1",
+    "password-new/pw-semiauto.ps1",
+    "password-new/pw-semiauto.md"
 )
 
 function Sync-ScriptsFromGitHub {
@@ -46,6 +48,10 @@ function Sync-ScriptsFromGitHub {
         $bakPath   = Join-Path -Path $BackupDir -ChildPath $scriptName
 
         try {
+            $destParent = Split-Path -Path $destPath -Parent
+            $backupParent = Split-Path -Path $bakPath -Parent
+            if (-not (Test-Path -LiteralPath $destParent)) { New-Item -ItemType Directory -Path $destParent -Force | Out-Null }
+            if (-not (Test-Path -LiteralPath $backupParent)) { New-Item -ItemType Directory -Path $backupParent -Force | Out-Null }
             Write-Output ("  [>] Fetching: " + $scriptName.PadRight(16) + "...")
             $webClient.DownloadFile($sourceUrl, $destPath)
             
@@ -66,8 +72,8 @@ function Sync-ScriptsFromGitHub {
 }
 
 # 3. Smart Cache Check (Skip downloading if files already exist)
-$existingFiles = Get-ChildItem -Path $ScriptsDir -Filter "*.ps1" -ErrorAction SilentlyContinue
-if (-not $existingFiles -or $existingFiles.Count -lt $ScriptList.Count) {
+$missingFiles = @($ScriptList | Where-Object { -not (Test-Path -LiteralPath (Join-Path -Path $ScriptsDir -ChildPath $_) -PathType Leaf) })
+if ($missingFiles.Count -gt 0) {
     Write-Output "[*] First-time setup detected. Downloading all scripts from repository..."
     Sync-ScriptsFromGitHub
 } else {
